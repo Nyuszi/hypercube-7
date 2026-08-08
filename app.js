@@ -407,7 +407,7 @@ function cancelDimAnim() {
  * removed axes collapse to 0 (zoom in). View is re-fit/centered every frame.
  */
 function animateDimensionChange(newN) {
-  newN = Math.max(3, Math.min(7, newN | 0));
+  newN = Math.max(1, Math.min(7, newN | 0));
   const oldN = state.settings.n;
   if (newN === oldN) return;
 
@@ -751,7 +751,7 @@ function setupControls() {
   };
 
   const applyN = (raw) => {
-    const newN = Math.round(clamp(Number(raw), 3, 7));
+    const newN = Math.round(clamp(Number(raw), 1, 7));
     setPair("n", "n-num", newN, (v) => String(v));
     animateDimensionChange(newN);
   };
@@ -918,7 +918,7 @@ function serializeSettings() {
 function applySerialized(data) {
   const s = defaultSettings();
   if (data.p && PALETTES[data.p]) s.palette = data.p;
-  if (data.n) s.n = Math.max(3, Math.min(7, Number(data.n)));
+  if (data.n) s.n = Math.max(1, Math.min(7, Number(data.n)));
   if (data.ns != null) s.nestScale = Number(data.ns);
   if (data.sx != null) s.stretchX = Number(data.sx);
   if (data.sw != null) s.strokeWidth = Number(data.sw);

@@ -312,7 +312,7 @@ function meanEdgeLength(pos, edges) {
  */
 export function buildHypercubeSvg(settings, options = {}) {
   const { highlightDim = null, asString = false } = options;
-  const n = Math.max(3, Math.min(7, settings.n | 0));
+  const n = Math.max(1, Math.min(7, settings.n | 0));
   const palette = resolvePalette({ ...settings, n });
   const basis = basisVectors(settings.angles, settings.lengths, n, settings.stretchX);
   let pos = projectedPositions(basis, NEST_DIM, settings.nestScale);
