@@ -50,6 +50,34 @@
       </div>
 
       <aside class="sidebar" id="sidebar">
+        <section class="section math-panel">
+          <h2>Math</h2>
+          <p class="math-def">
+            The <strong>hypercube graph</strong> <span class="math-sym" id="math-qn">Q<sub>7</sub></span>
+            has vertex set <span class="math-sym">{0,1}<sup>n</sup></span>
+            (binary strings of length <span class="math-sym">n</span>).
+            Two vertices are adjacent iff they differ in exactly one bit
+            (Hamming distance&nbsp;1).
+          </p>
+          <dl class="math-stats" id="math-stats">
+            <div><dt>Vertices</dt><dd id="stat-vertices">128</dd></div>
+            <div><dt>Edges</dt><dd id="stat-edges">448</dd></div>
+            <div><dt>Degree</dt><dd id="stat-degree">7</dd></div>
+          </dl>
+          <ul class="math-notes">
+            <li>Equal-color edges flip the same bit — one dimension.</li>
+            <li>The graph is bipartite (partition by parity of the number of 1-bits).</li>
+            <li>Hamilton paths correspond to Gray codes on <span class="math-sym">n</span> bits.</li>
+            <li>This drawing is a <strong>2D projection</strong> of <span class="math-sym">Q<sub>n</sub></span>
+              (nested / Schlegel for the 4th dimension), not a literal view of <span class="math-sym">n</span>-space.</li>
+          </ul>
+          <div class="toggle-row">
+            <input type="checkbox" id="show-labels">
+            <label for="show-labels">Binary labels on vertices</label>
+          </div>
+          <p class="math-hint">Hover a vertex for its binary address even when labels are off.</p>
+        </section>
+
         <section class="section">
           <h2>Structure</h2>
           <div class="slider-block">

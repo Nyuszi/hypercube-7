@@ -7,6 +7,7 @@ import {
   resolvePalette,
   buildHypercubeSvg,
   paletteGroups,
+  graphStats,
 } from "./hypercube.js";
 
 const PRESET_KEY = "hypercube-presets-v1";
@@ -307,12 +308,27 @@ function syncFormFromSettings() {
   setPair("nest-scale", "nest-scale-num", s.nestScale, (v) => v.toFixed(2));
   setPair("stretch-x", "stretch-x-num", s.stretchX, (v) => v.toFixed(2));
   document.getElementById("show-vertices").checked = s.showVertices;
+  document.getElementById("show-labels").checked = !!s.showLabels;
   setPair("vertex-radius", "vertex-radius-num", s.vertexRadius, (v) => v.toFixed(1));
   setPair("stroke-width", "stroke-width-num", s.strokeWidth, (v) => v.toFixed(2));
   setPair("glow", "glow-num", s.glow, (v) => v.toFixed(1));
   el.brandN.textContent = `Q${subscript(s.n)}`;
   buildDimControls();
   updateSwatches();
+  updateMathPanel();
+}
+
+function updateMathPanel() {
+  const n = state.settings.n;
+  const { vertices, edges, degree } = graphStats(n);
+  const qn = document.getElementById("math-qn");
+  if (qn) qn.innerHTML = `Q<sub>${n}</sub>`;
+  const v = document.getElementById("stat-vertices");
+  const e = document.getElementById("stat-edges");
+  const d = document.getElementById("stat-degree");
+  if (v) v.textContent = String(vertices);
+  if (e) e.textContent = String(edges);
+  if (d) d.textContent = String(degree);
 }
 
 /* —— Redraw —— */
@@ -331,6 +347,7 @@ function redraw() {
   el.stageInner.replaceChildren(svg);
   el.stageWrap.style.background = background;
   applyViewTransform();
+  updateMathPanel();
 }
 
 function applyViewTransform() {
@@ -641,6 +658,12 @@ function setupControls() {
     scheduleHash();
   });
 
+  document.getElementById("show-labels").addEventListener("change", (e) => {
+    state.settings.showLabels = e.target.checked;
+    scheduleRedraw();
+    scheduleHash();
+  });
+
   document.getElementById("btn-reset").addEventListener("click", () => {
     cancelDimAnim();
     state.settings = defaultSettings();
@@ -757,6 +780,7 @@ function serializeSettings() {
     sw: s.strokeWidth,
     vr: s.vertexRadius,
     sv: s.showVertices ? 1 : 0,
+    sl: s.showLabels ? 1 : 0,
     g: s.glow,
     L: s.lengths,
     A: s.angles,
@@ -775,6 +799,7 @@ function applySerialized(data) {
   if (data.sw != null) s.strokeWidth = Number(data.sw);
   if (data.vr != null) s.vertexRadius = Number(data.vr);
   if (data.sv != null) s.showVertices = Boolean(data.sv);
+  if (data.sl != null) s.showLabels = Boolean(data.sl);
   if (data.g != null) s.glow = Number(data.g);
   if (Array.isArray(data.L) && data.L.length === 7) s.lengths = data.L.map(Number);
   if (Array.isArray(data.A) && data.A.length === 7) s.angles = data.A.map(Number);

@@ -169,6 +169,7 @@ export function defaultSettings() {
     strokeWidth: 0.9,
     vertexRadius: 1.5,
     showVertices: true,
+    showLabels: false,
     glow: 0,
     lengths: DEFAULT_BASIS_POLAR.map(([, len]) => len),
     angles: DEFAULT_BASIS_POLAR.map(([deg]) => deg),
@@ -376,20 +377,60 @@ export function buildHypercubeSvg(settings, options = {}) {
       vg.setAttribute("stroke", palette.vertexStroke);
       vg.setAttribute("stroke-width", String(settings.strokeWidth * 0.8));
     }
-    for (const [x, y] of pos) {
+    for (let v = 0; v < pos.length; v++) {
+      const [x, y] = pos[v];
       const c = document.createElementNS(NS, "circle");
       c.setAttribute("cx", x.toFixed(2));
       c.setAttribute("cy", y.toFixed(2));
       c.setAttribute("r", String(settings.vertexRadius));
+      const tip = document.createElementNS(NS, "title");
+      tip.textContent = toBinaryLabel(v, n);
+      c.appendChild(tip);
       vg.appendChild(c);
     }
     svg.appendChild(vg);
+  }
+
+  if (settings.showLabels) {
+    const lg = document.createElementNS(NS, "g");
+    const labelFill = palette.group === "bright" ? "#1a1a1a" : "#e8ecf2";
+    const fontSize = Math.max(3.2, Math.min(8.5, 15 - n * 1.1));
+    lg.setAttribute("fill", labelFill);
+    lg.setAttribute("font-family", "IBM Plex Mono, ui-monospace, monospace");
+    lg.setAttribute("font-size", String(fontSize));
+    lg.setAttribute("text-anchor", "middle");
+    lg.setAttribute("dominant-baseline", "hanging");
+    lg.setAttribute("opacity", "0.92");
+    for (let v = 0; v < pos.length; v++) {
+      const [x, y] = pos[v];
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("x", x.toFixed(2));
+      t.setAttribute("y", (y + settings.vertexRadius + 1.2).toFixed(2));
+      t.textContent = toBinaryLabel(v, n);
+      lg.appendChild(t);
+    }
+    svg.appendChild(lg);
   }
 
   if (asString) {
     return new XMLSerializer().serializeToString(svg);
   }
   return { svg, width, height, background: palette.background };
+}
+
+/** Binary address of a vertex (bit 0 = least significant = dimension 1). */
+export function toBinaryLabel(v, n) {
+  return v.toString(2).padStart(n, "0");
+}
+
+export function graphStats(n) {
+  const dim = Math.max(0, n | 0);
+  return {
+    n: dim,
+    vertices: 1 << dim,
+    edges: dim * (1 << Math.max(0, dim - 1)),
+    degree: dim,
+  };
 }
 
 export function paletteGroups() {

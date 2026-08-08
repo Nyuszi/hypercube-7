@@ -14,6 +14,7 @@ Then visit [http://127.0.0.1:8731/](http://127.0.0.1:8731/).
 ## Features
 
 - Nested (cuboid-in-cuboid) 4th dimension + shelf layout for higher dims
+- Math panel: definition of \(Q_n\), live vertex/edge/degree counts, binary labels
 - Dark & bright palettes, per-dimension lengths / angles / colors
 - Live zoom, pan, fit
 - Animated dimension changes (grow / collapse axes with auto-fit)
