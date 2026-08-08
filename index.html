@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#161a22">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Hypercube Q₇ — Interactive Viewer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +23,7 @@
       </div>
 
       <div class="topbar-actions">
-        <div class="select-wrap">
+        <div class="select-wrap png-wrap">
           <label for="png-scale">PNG</label>
           <select id="png-scale" class="field" aria-label="Screenshot scale">
             <option value="1">1×</option>
@@ -33,6 +35,9 @@
         <button type="button" class="btn" id="btn-export" title="Export SVG (E)">Export SVG</button>
         <button type="button" class="btn" id="btn-copy-link" title="Copy shareable link">Copy link</button>
         <button type="button" class="btn primary" id="btn-reset" title="Reset (R)">Reset</button>
+        <button type="button" class="btn primary btn-controls" id="btn-controls" aria-controls="sidebar" aria-expanded="false">
+          Controls
+        </button>
       </div>
     </header>
 
@@ -43,13 +48,35 @@
         </div>
         <div class="stage-hud">
           <button type="button" class="btn" id="btn-fit">Fit</button>
-          <button type="button" class="btn" id="btn-zoom-in">+</button>
-          <button type="button" class="btn" id="btn-zoom-out">−</button>
+          <button type="button" class="btn" id="btn-zoom-in" aria-label="Zoom in">+</button>
+          <button type="button" class="btn" id="btn-zoom-out" aria-label="Zoom out">−</button>
         </div>
-        <div class="hint">Scroll to zoom · drag to pan</div>
+        <div class="hint">
+          <span class="hint-desktop">Scroll to zoom · drag to pan</span>
+          <span class="hint-mobile">Pinch to zoom · drag to pan</span>
+        </div>
       </div>
 
+      <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
       <aside class="sidebar" id="sidebar">
+        <div class="sidebar-mobile-bar">
+          <strong>Controls</strong>
+          <button type="button" class="btn" id="btn-controls-close" aria-label="Close controls">Done</button>
+        </div>
+        <div class="mobile-export">
+          <div class="select-wrap">
+            <label for="png-scale-mobile">PNG</label>
+            <select id="png-scale-mobile" class="field" aria-label="Screenshot scale">
+              <option value="1">1×</option>
+              <option value="2" selected>2×</option>
+              <option value="3">3×</option>
+            </select>
+          </div>
+          <button type="button" class="btn" id="btn-screenshot-mobile">Screenshot</button>
+          <button type="button" class="btn" id="btn-export-mobile">Export SVG</button>
+          <button type="button" class="btn" id="btn-copy-link-mobile">Copy link</button>
+          <button type="button" class="btn primary" id="btn-reset-mobile">Reset</button>
+        </div>
         <section class="section math-panel">
           <h2>Math</h2>
           <p class="math-def">

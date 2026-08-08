@@ -18,8 +18,11 @@ const state = {
   view: { scale: 1, x: 0, y: 0 },
   panning: false,
   panStart: null,
+  pointers: new Map(),
+  pinch: null,
   raf: 0,
   hashTimer: 0,
+  resizeTimer: 0,
   dimAnim: null, // animation frame id while morphing dimensions
 };
 
@@ -312,6 +315,8 @@ function syncFormFromSettings() {
   setPair("vertex-radius", "vertex-radius-num", s.vertexRadius, (v) => v.toFixed(1));
   setPair("stroke-width", "stroke-width-num", s.strokeWidth, (v) => v.toFixed(2));
   setPair("glow", "glow-num", s.glow, (v) => v.toFixed(1));
+  const pngMobile = document.getElementById("png-scale-mobile");
+  if (pngMobile) pngMobile.value = String(s.pngScale);
   el.brandN.textContent = `Q${subscript(s.n)}`;
   buildDimControls();
   updateSwatches();
@@ -517,7 +522,25 @@ function animateDimensionChange(newN) {
   state.dimAnim = requestAnimationFrame(tick);
 }
 
-/* —— Zoom / pan —— */
+function zoomAt(mx, my, nextScale) {
+  const old = state.view.scale;
+  const next = Math.min(8, Math.max(0.05, nextScale));
+  if (old <= 0) return;
+  state.view.x = mx - (mx - state.view.x) * (next / old);
+  state.view.y = my - (my - state.view.y) * (next / old);
+  state.view.scale = next;
+  applyViewTransform();
+}
+
+function pointerDistance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function pointerMidpoint(a, b) {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+/* —— Zoom / pan (mouse wheel, drag, pinch) —— */
 function setupStageInteractions() {
   el.stage.addEventListener(
     "wheel",
@@ -527,19 +550,36 @@ function setupStageInteractions() {
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
-      const old = state.view.scale;
-      const next = Math.min(8, Math.max(0.05, old * factor));
-      // zoom toward pointer
-      state.view.x = mx - (mx - state.view.x) * (next / old);
-      state.view.y = my - (my - state.view.y) * (next / old);
-      state.view.scale = next;
-      applyViewTransform();
+      zoomAt(mx, my, state.view.scale * factor);
     },
     { passive: false },
   );
 
   el.stage.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try {
+      el.stage.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+
+    if (state.pointers.size === 2) {
+      const [a, b] = [...state.pointers.values()];
+      const rect = el.stage.getBoundingClientRect();
+      const mid = pointerMidpoint(a, b);
+      state.pinch = {
+        dist: pointerDistance(a, b),
+        scale: state.view.scale,
+        mx: mid.x - rect.left,
+        my: mid.y - rect.top,
+      };
+      state.panning = false;
+      state.panStart = null;
+      el.stage.classList.remove("panning");
+      return;
+    }
+
     state.panning = true;
     state.panStart = {
       x: e.clientX,
@@ -548,33 +588,123 @@ function setupStageInteractions() {
       vy: state.view.y,
     };
     el.stage.classList.add("panning");
-    el.stage.setPointerCapture(e.pointerId);
   });
 
   el.stage.addEventListener("pointermove", (e) => {
+    if (!state.pointers.has(e.pointerId)) return;
+    state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (state.pointers.size >= 2 && state.pinch) {
+      const [a, b] = [...state.pointers.values()];
+      const dist = pointerDistance(a, b);
+      if (state.pinch.dist > 0) {
+        const rect = el.stage.getBoundingClientRect();
+        const mid = pointerMidpoint(a, b);
+        zoomAt(
+          mid.x - rect.left,
+          mid.y - rect.top,
+          state.pinch.scale * (dist / state.pinch.dist),
+        );
+      }
+      return;
+    }
+
     if (!state.panning || !state.panStart) return;
     state.view.x = state.panStart.vx + (e.clientX - state.panStart.x);
     state.view.y = state.panStart.vy + (e.clientY - state.panStart.y);
     applyViewTransform();
   });
 
-  const endPan = () => {
-    state.panning = false;
-    state.panStart = null;
-    el.stage.classList.remove("panning");
+  const endPointer = (e) => {
+    state.pointers.delete(e.pointerId);
+    if (state.pointers.size < 2) state.pinch = null;
+    if (state.pointers.size === 0) {
+      state.panning = false;
+      state.panStart = null;
+      el.stage.classList.remove("panning");
+    } else if (state.pointers.size === 1) {
+      const remaining = [...state.pointers.values()][0];
+      state.panning = true;
+      state.panStart = {
+        x: remaining.x,
+        y: remaining.y,
+        vx: state.view.x,
+        vy: state.view.y,
+      };
+    }
   };
-  el.stage.addEventListener("pointerup", endPan);
-  el.stage.addEventListener("pointercancel", endPan);
+  el.stage.addEventListener("pointerup", endPointer);
+  el.stage.addEventListener("pointercancel", endPointer);
+  el.stage.addEventListener("lostpointercapture", endPointer);
 
   document.getElementById("btn-fit").addEventListener("click", fitView);
   document.getElementById("btn-zoom-in").addEventListener("click", () => {
-    state.view.scale = Math.min(8, state.view.scale * 1.15);
-    applyViewTransform();
+    const rect = el.stage.getBoundingClientRect();
+    zoomAt(rect.width / 2, rect.height / 2, state.view.scale * 1.15);
   });
   document.getElementById("btn-zoom-out").addEventListener("click", () => {
-    state.view.scale = Math.max(0.05, state.view.scale / 1.15);
-    applyViewTransform();
+    const rect = el.stage.getBoundingClientRect();
+    zoomAt(rect.width / 2, rect.height / 2, state.view.scale / 1.15);
   });
+}
+
+function setControlsOpen(open) {
+  document.body.classList.toggle("controls-open", open);
+  const btn = document.getElementById("btn-controls");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (backdrop) backdrop.hidden = !open;
+}
+
+function setupMobileChrome() {
+  const openBtn = document.getElementById("btn-controls");
+  const closeBtn = document.getElementById("btn-controls-close");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  openBtn?.addEventListener("click", () => setControlsOpen(true));
+  closeBtn?.addEventListener("click", () => setControlsOpen(false));
+  backdrop?.addEventListener("click", () => setControlsOpen(false));
+
+  const syncPng = (from, to) => {
+    from?.addEventListener("change", () => {
+      state.settings.pngScale = Number(from.value);
+      if (to) to.value = from.value;
+      scheduleHash();
+    });
+  };
+  const pngDesktop = document.getElementById("png-scale");
+  const pngMobile = document.getElementById("png-scale-mobile");
+  syncPng(pngDesktop, pngMobile);
+  syncPng(pngMobile, pngDesktop);
+
+  document.getElementById("btn-screenshot-mobile")?.addEventListener("click", () => exportPng());
+  document.getElementById("btn-export-mobile")?.addEventListener("click", () => {
+    exportSvg();
+    setControlsOpen(false);
+  });
+  document.getElementById("btn-copy-link-mobile")?.addEventListener("click", () => copyShareLink());
+  document.getElementById("btn-reset-mobile")?.addEventListener("click", () => {
+    document.getElementById("btn-reset")?.click();
+    setControlsOpen(false);
+  });
+
+  window.matchMedia("(max-width: 860px)").addEventListener("change", (e) => {
+    if (!e.matches) setControlsOpen(false);
+    requestAnimationFrame(fitView);
+  });
+}
+
+function setupResizeFit() {
+  const onResize = () => {
+    clearTimeout(state.resizeTimer);
+    state.resizeTimer = setTimeout(() => fitView(), 120);
+  };
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", () => {
+    setTimeout(fitView, 200);
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", onResize);
+  }
 }
 
 /* —— Controls —— */
@@ -585,11 +715,6 @@ function setupControls() {
     updateSwatches();
     buildDimControls();
     scheduleRedraw();
-    scheduleHash();
-  });
-
-  el.pngScale.addEventListener("change", () => {
-    state.settings.pngScale = Number(el.pngScale.value);
     scheduleHash();
   });
 
@@ -931,16 +1056,15 @@ function init() {
   if (!fromHash) state.settings = defaultSettings();
   syncFormFromSettings();
   setupControls();
+  setupMobileChrome();
   setupStageInteractions();
+  setupResizeFit();
   setupKeyboard();
   renderPresetList();
   redraw();
   requestAnimationFrame(() => {
     fitView();
     scheduleHash();
-  });
-  window.addEventListener("resize", () => {
-    // keep center roughly stable; user can Fit
   });
 }
 
