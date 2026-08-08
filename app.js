@@ -2,6 +2,7 @@ import {
   PALETTES,
   DIM_LABELS,
   NEST_DIM,
+  DEFAULT_NEST_SCALE,
   defaultSettings,
   referencePreset,
   resolvePalette,
@@ -24,6 +25,10 @@ const state = {
   hashTimer: 0,
   resizeTimer: 0,
   dimAnim: null, // animation frame id while morphing dimensions
+  // Last settled geometry — used so interrupting a dim morph cannot zero lengths.
+  committedN: 7,
+  committedLengths: null,
+  committedNest: DEFAULT_NEST_SCALE,
 };
 
 const el = {
@@ -185,6 +190,7 @@ function buildDimControls() {
         num.value = v.toFixed(2);
         if (nestRange) nestRange.value = String(v);
         if (nestNum) nestNum.value = v.toFixed(2);
+        commitGeometry();
         scheduleRedraw();
         scheduleHash();
       });
@@ -213,6 +219,7 @@ function buildDimControls() {
         state.settings.lengths[i] = v;
         range.value = String(v);
         num.value = String(v);
+        commitGeometry();
         scheduleRedraw();
         scheduleHash();
       };
@@ -394,6 +401,27 @@ function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
+function ensureCommitted() {
+  if (!state.committedLengths) {
+    state.committedN = state.settings.n;
+    state.committedLengths = state.settings.lengths.map(Number);
+    state.committedNest = state.settings.nestScale;
+  }
+}
+
+function commitGeometry() {
+  state.committedN = state.settings.n;
+  state.committedLengths = state.settings.lengths.map(Number);
+  state.committedNest = state.settings.nestScale;
+}
+
+function restoreCommittedGeometry() {
+  ensureCommitted();
+  state.settings.n = state.committedN;
+  state.settings.lengths = state.committedLengths.slice();
+  state.settings.nestScale = state.committedNest;
+}
+
 function cancelDimAnim() {
   if (state.dimAnim != null) {
     cancelAnimationFrame(state.dimAnim);
@@ -407,17 +435,33 @@ function cancelDimAnim() {
  * removed axes collapse to 0 (zoom in). View is re-fit/centered every frame.
  */
 function animateDimensionChange(newN) {
-  newN = Math.max(1, Math.min(7, newN | 0));
-  const oldN = state.settings.n;
-  if (newN === oldN) return;
+  newN = Math.max(0, Math.min(7, newN | 0));
+  ensureCommitted();
 
-  cancelDimAnim();
+  // Interrupting a morph must not keep half-collapsed lengths as the new target.
+  if (state.dimAnim != null) {
+    cancelDimAnim();
+    restoreCommittedGeometry();
+  }
+
+  const oldN = state.committedN;
+  if (newN === oldN) {
+    state.settings.n = newN;
+    setPair("n", "n-num", newN, (v) => String(v));
+    el.brandN.textContent = `Q${subscript(newN)}`;
+    buildDimControls();
+    updateSwatches();
+    redraw();
+    fitView();
+    return;
+  }
+
   el.stageInner.classList.add("dim-animating");
 
-  const duration = 520 + Math.abs(newN - oldN) * 90;
-  const targetLengths = state.settings.lengths.map(Number);
-  const targetNest = state.settings.nestScale;
-  const maxN = Math.max(oldN, newN);
+  const duration = 480 + Math.abs(newN - oldN) * 80;
+  const targetLengths = state.committedLengths.slice();
+  const targetNest = state.committedNest;
+  const maxN = Math.max(oldN, newN, 1); // render at least Q1 shell while morphing to/from Q0
 
   // Snapshot start geometry (render at maxN so edges can appear/disappear).
   const startLengths = targetLengths.map((len, i) => {
@@ -460,13 +504,12 @@ function animateDimensionChange(newN) {
       state.settings.lengths[i] = lerp(startLengths[i], endLengths[i], e);
     }
     state.settings.nestScale = lerp(startNest, endNest, e);
-    state.settings.n = maxN;
+    // Keep a drawable n during the morph; Q0 (a single point) settles at the end.
+    state.settings.n = Math.max(oldN, newN, 1);
 
-    // Soft line fade: new/dying dims get opacity via highlight-style on groups
     state.highlightDim = null;
     redraw();
 
-    // Emphasize changing dimension groups with opacity based on progress
     const svg = el.stageInner.querySelector("svg");
     if (svg) {
       svg.querySelectorAll("g[data-dimension]").forEach((g) => {
@@ -484,18 +527,17 @@ function animateDimensionChange(newN) {
 
     const fit = computeFit(svg);
     if (fit) {
-      // Blend from previous framing into the new fit so zoom eases with the morph
       state.view = {
         scale: lerp(startView.scale, fit.scale, e),
         x: lerp(startView.x, fit.x, e),
         y: lerp(startView.y, fit.y, e),
       };
-      // Prefer live fit late in the animation so content stays centered as size changes
       if (e > 0.35) {
+        const t = (e - 0.35) / 0.65;
         state.view = {
-          scale: lerp(state.view.scale, fit.scale, (e - 0.35) / 0.65),
-          x: lerp(state.view.x, fit.x, (e - 0.35) / 0.65),
-          y: lerp(state.view.y, fit.y, (e - 0.35) / 0.65),
+          scale: lerp(state.view.scale, fit.scale, t),
+          x: lerp(state.view.x, fit.x, t),
+          y: lerp(state.view.y, fit.y, t),
         };
       }
       applyViewTransform();
@@ -506,11 +548,13 @@ function animateDimensionChange(newN) {
       return;
     }
 
-    // Settle on final discrete dimension
+    // Settle on final discrete dimension and commit stable geometry.
     state.settings.n = newN;
     state.settings.lengths = targetLengths.slice();
     state.settings.nestScale = targetNest;
+    commitGeometry();
     setPair("nest-scale", "nest-scale-num", targetNest, (v) => v.toFixed(2));
+    setPair("n", "n-num", newN, (v) => String(v));
     cancelDimAnim();
     buildDimControls();
     updateSwatches();
@@ -738,6 +782,7 @@ function setupControls() {
       if (key === "nestScale") {
         const inline = document.getElementById("nest-inline-num");
         if (inline) inline.value = fmt(v);
+        commitGeometry();
       }
       scheduleRedraw();
       scheduleHash();
@@ -751,7 +796,7 @@ function setupControls() {
   };
 
   const applyN = (raw) => {
-    const newN = Math.round(clamp(Number(raw), 1, 7));
+    const newN = Math.round(clamp(Number(raw), 0, 7));
     setPair("n", "n-num", newN, (v) => String(v));
     animateDimensionChange(newN);
   };
@@ -792,6 +837,7 @@ function setupControls() {
   document.getElementById("btn-reset").addEventListener("click", () => {
     cancelDimAnim();
     state.settings = defaultSettings();
+    commitGeometry();
     syncFormFromSettings();
     redraw();
     fitView();
@@ -802,6 +848,7 @@ function setupControls() {
   document.getElementById("btn-preset-ref").addEventListener("click", () => {
     cancelDimAnim();
     state.settings = referencePreset();
+    commitGeometry();
     syncFormFromSettings();
     redraw();
     fitView();
@@ -848,6 +895,7 @@ function renderPresetList() {
     loadBtn.className = "btn";
     loadBtn.textContent = "Load";
     loadBtn.addEventListener("click", () => {
+      cancelDimAnim();
       state.settings = { ...defaultSettings(), ...item.settings };
       // ensure arrays
       state.settings.lengths = [...item.settings.lengths];
@@ -856,6 +904,7 @@ function renderPresetList() {
       state.settings.edgeColors = item.settings.edgeColors
         ? [...item.settings.edgeColors]
         : null;
+      commitGeometry();
       syncFormFromSettings();
       scheduleRedraw();
       scheduleHash();
@@ -918,7 +967,7 @@ function serializeSettings() {
 function applySerialized(data) {
   const s = defaultSettings();
   if (data.p && PALETTES[data.p]) s.palette = data.p;
-  if (data.n) s.n = Math.max(1, Math.min(7, Number(data.n)));
+  if (data.n != null) s.n = Math.max(0, Math.min(7, Number(data.n)));
   if (data.ns != null) s.nestScale = Number(data.ns);
   if (data.sx != null) s.stretchX = Number(data.sx);
   if (data.sw != null) s.strokeWidth = Number(data.sw);
@@ -1054,6 +1103,7 @@ function init() {
   fillPaletteSelect();
   const fromHash = loadFromHash();
   if (!fromHash) state.settings = defaultSettings();
+  commitGeometry();
   syncFormFromSettings();
   setupControls();
   setupMobileChrome();

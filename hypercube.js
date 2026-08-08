@@ -312,10 +312,14 @@ function meanEdgeLength(pos, edges) {
  */
 export function buildHypercubeSvg(settings, options = {}) {
   const { highlightDim = null, asString = false } = options;
-  const n = Math.max(1, Math.min(7, settings.n | 0));
+  const n = Math.max(0, Math.min(7, settings.n | 0));
   const palette = resolvePalette({ ...settings, n });
-  const basis = basisVectors(settings.angles, settings.lengths, n, settings.stretchX);
-  let pos = projectedPositions(basis, NEST_DIM, settings.nestScale);
+  const basis = n === 0
+    ? []
+    : basisVectors(settings.angles, settings.lengths, n, settings.stretchX);
+  let pos = n === 0
+    ? [[0, 0]]
+    : projectedPositions(basis, NEST_DIM, settings.nestScale);
 
   const xs = pos.map((p) => p[0]);
   const ys = pos.map((p) => p[1]);
@@ -323,9 +327,14 @@ export function buildHypercubeSvg(settings, options = {}) {
   const minY = Math.min(...ys);
   const maxX = Math.max(...xs);
   const maxY = Math.max(...ys);
-  const width = maxX - minX + 2 * MARGIN;
-  const height = maxY - minY + 2 * MARGIN;
-  pos = pos.map(([x, y]) => [x - minX + MARGIN, y - minY + MARGIN]);
+  // Q0 is a single point — give the canvas a stable square so Fit works.
+  const spanX = Math.max(maxX - minX, n === 0 ? 40 : 0);
+  const spanY = Math.max(maxY - minY, n === 0 ? 40 : 0);
+  const width = spanX + 2 * MARGIN;
+  const height = spanY + 2 * MARGIN;
+  const ox = MARGIN + (spanX - (maxX - minX)) / 2;
+  const oy = MARGIN + (spanY - (maxY - minY)) / 2;
+  pos = pos.map(([x, y]) => [x - minX + ox, y - minY + oy]);
 
   const groups = edgesByDimension(n);
   const order = [...Array(n).keys()].sort(
@@ -402,19 +411,23 @@ export function buildHypercubeSvg(settings, options = {}) {
   }
   svg.appendChild(edgesRoot);
 
-  if (settings.showVertices && settings.vertexRadius > 0) {
+  const drawVerts = n === 0 || (settings.showVertices && settings.vertexRadius > 0);
+  if (drawVerts) {
     const vg = document.createElementNS(NS, "g");
     vg.setAttribute("fill", palette.vertex);
     if (palette.vertexStroke && palette.vertexStroke !== "none") {
       vg.setAttribute("stroke", palette.vertexStroke);
       vg.setAttribute("stroke-width", String(settings.strokeWidth * 0.8));
     }
+    const r = n === 0
+      ? Math.max(settings.vertexRadius || 0, 5)
+      : settings.vertexRadius;
     for (let v = 0; v < pos.length; v++) {
       const [x, y] = pos[v];
       const c = document.createElementNS(NS, "circle");
       c.setAttribute("cx", x.toFixed(2));
       c.setAttribute("cy", y.toFixed(2));
-      c.setAttribute("r", String(settings.vertexRadius));
+      c.setAttribute("r", String(r));
       const tip = document.createElementNS(NS, "title");
       tip.textContent = toBinaryLabel(v, n);
       c.appendChild(tip);
@@ -452,6 +465,7 @@ export function buildHypercubeSvg(settings, options = {}) {
 
 /** Binary address of a vertex (bit 0 = least significant = dimension 1). */
 export function toBinaryLabel(v, n) {
+  if (n <= 0) return "∅";
   return v.toString(2).padStart(n, "0");
 }
 
@@ -460,7 +474,7 @@ export function graphStats(n) {
   return {
     n: dim,
     vertices: 1 << dim,
-    edges: dim * (1 << Math.max(0, dim - 1)),
+    edges: dim === 0 ? 0 : dim * (1 << (dim - 1)),
     degree: dim,
   };
 }
