@@ -103,7 +103,7 @@ export const PALETTES = {
     vertexStroke: "none",
   },
   reference: {
-    group: "dark",
+    group: "bright",
     label: "Reference",
     background: "#ffffff",
     edges: ["#2b2b2b", "#2b2b2b", "#2b2b2b", "#8d24b8", "#1a7f27", "#1c3fc4", "#cf2233"],
@@ -160,9 +160,24 @@ export const PALETTES = {
   },
 };
 
+/** Prefer a bright palette when the OS/browser is in light mode. */
+export function systemDefaultPalette() {
+  try {
+    if (
+      typeof matchMedia === "function" &&
+      matchMedia("(prefers-color-scheme: light)").matches
+    ) {
+      return "paper";
+    }
+  } catch {
+    /* ignore */
+  }
+  return "neon";
+}
+
 export function defaultSettings() {
   return {
-    palette: "neon",
+    palette: systemDefaultPalette(),
     n: 7,
     nestScale: DEFAULT_NEST_SCALE,
     stretchX: 1.45,
@@ -177,6 +192,23 @@ export function defaultSettings() {
     edgeColors: null, // null = use palette; else length-7 array
     pngScale: 2,
   };
+}
+
+/** Relative luminance of a #rrggbb (or #rgb) color; used for label contrast. */
+export function luminance(hex) {
+  let h = String(hex || "#000000").replace("#", "");
+  if (h.length === 3) {
+    h = h.split("").map((c) => c + c).join("");
+  }
+  const toLin = (v) => {
+    const s = parseInt(h.slice(v, v + 2), 16) / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * toLin(0) + 0.7152 * toLin(2) + 0.0722 * toLin(4);
+}
+
+export function labelColorForBackground(bg) {
+  return luminance(bg) > 0.55 ? "#1a1a1a" : "#e8ecf2";
 }
 
 export function referencePreset() {
@@ -393,7 +425,7 @@ export function buildHypercubeSvg(settings, options = {}) {
 
   if (settings.showLabels) {
     const lg = document.createElementNS(NS, "g");
-    const labelFill = palette.group === "bright" ? "#1a1a1a" : "#e8ecf2";
+    const labelFill = labelColorForBackground(palette.background);
     const fontSize = Math.max(3.2, Math.min(8.5, 15 - n * 1.1));
     lg.setAttribute("fill", labelFill);
     lg.setAttribute("font-family", "IBM Plex Mono, ui-monospace, monospace");
