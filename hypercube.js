@@ -213,18 +213,21 @@ export function systemDefaultPalette() {
 }
 
 export function defaultSettings() {
+  const lengths = DEFAULT_BASIS_POLAR.map(([, len]) => len);
   return {
     palette: systemDefaultPalette(),
     projection: "nested",
     n: 7,
     nestScale: DEFAULT_NEST_SCALE,
+    /** Dim-3 edge length on the nested (4th-dim) cuboid; independent of outer depth. */
+    innerDepth: lengths[2] * DEFAULT_NEST_SCALE,
     stretchX: 1.45,
     strokeWidth: 0.9,
     vertexRadius: 1.5,
     showVertices: true,
     showLabels: false,
     glow: 0,
-    lengths: DEFAULT_BASIS_POLAR.map(([, len]) => len),
+    lengths,
     angles: DEFAULT_BASIS_POLAR.map(([deg]) => deg),
     visible: [true, true, true, true, true, true, true],
     edgeColors: null, // null = use palette; else length-7 array
@@ -241,6 +244,7 @@ export function applyProjectionDefaults(settings, projection) {
     s.angles = SZALKAI_BASIS_POLAR.map(([deg]) => deg);
     s.stretchX = 1;
     s.nestScale = DEFAULT_NEST_SCALE;
+    s.innerDepth = s.lengths[2] * s.nestScale;
   } else if (s.projection === "petrie") {
     s.lengths = Array(7).fill(PETRIE_EDGE);
   } else {
@@ -248,6 +252,7 @@ export function applyProjectionDefaults(settings, projection) {
     s.angles = DEFAULT_BASIS_POLAR.map(([deg]) => deg);
     s.nestScale = DEFAULT_NEST_SCALE;
     s.stretchX = 1.45;
+    s.innerDepth = s.lengths[2] * s.nestScale;
   }
   return s;
 }
@@ -290,6 +295,7 @@ export function referencePreset() {
   s.glow = 0;
   s.lengths = [72, 52, 58, 1, 300, 230, 470];
   s.angles = [8, 98, 148, 0, 6, 78, 108];
+  s.innerDepth = s.lengths[2] * s.nestScale;
   return s;
 }
 
@@ -352,29 +358,74 @@ export function petrieBasisVectors(lengths, n, angleN = n) {
   return basis;
 }
 
-export function projectedPositions(basis, nestDim = NEST_DIM, nestScale = DEFAULT_NEST_SCALE) {
+/**
+ * Nested / Schlegel projection.
+ * @param {[number, number]|null} innerDepthVec Dim-3 basis vector for the nested
+ *   cuboid. When null, depth scales with nestScale (classic uniform nest).
+ */
+export function projectedPositions(
+  basis,
+  nestDim = NEST_DIM,
+  nestScale = DEFAULT_NEST_SCALE,
+  innerDepthVec = null,
+) {
   const n = basis.length;
   const cubeDims = Math.min(3, n);
-  const center = [0, 0];
-  for (let i = 0; i < cubeDims; i++) {
-    center[0] += basis[i][0] * 0.5;
-    center[1] += basis[i][1] * 0.5;
-  }
+  const hasCustomDepth =
+    cubeDims >= 3 && Array.isArray(innerDepthVec) && innerDepthVec.length >= 2;
+  const b2inner = hasCustomDepth
+    ? [innerDepthVec[0], innerDepthVec[1]]
+    : null;
 
   const positions = [];
   for (let v = 0; v < 1 << n; v++) {
+    const nested = n > nestDim && ((v >> nestDim) & 1) === 1;
     let x = 0;
     let y = 0;
-    for (let i = 0; i < cubeDims; i++) {
-      if ((v >> i) & 1) {
-        x += basis[i][0];
-        y += basis[i][1];
+
+    if (!nested) {
+      for (let i = 0; i < cubeDims; i++) {
+        if ((v >> i) & 1) {
+          x += basis[i][0];
+          y += basis[i][1];
+        }
       }
-    }
-    if (n > nestDim && (v >> nestDim) & 1) {
+    } else if (!hasCustomDepth) {
+      // Classic uniform homothety toward the cube center.
+      const center = [0, 0];
+      for (let i = 0; i < cubeDims; i++) {
+        center[0] += basis[i][0] * 0.5;
+        center[1] += basis[i][1] * 0.5;
+      }
+      for (let i = 0; i < cubeDims; i++) {
+        if ((v >> i) & 1) {
+          x += basis[i][0];
+          y += basis[i][1];
+        }
+      }
       x = center[0] + nestScale * (x - center[0]);
       y = center[1] + nestScale * (y - center[1]);
+    } else {
+      // Face (dims 0–1) uses nestScale; depth uses the custom inner vector.
+      // When innerDepthVec === nestScale * basis[2], this matches classic nest.
+      for (let i = 0; i < Math.min(2, cubeDims); i++) {
+        if ((v >> i) & 1) {
+          x += basis[i][0] * nestScale;
+          y += basis[i][1] * nestScale;
+        }
+        x += basis[i][0] * 0.5 * (1 - nestScale);
+        y += basis[i][1] * 0.5 * (1 - nestScale);
+      }
+      if (cubeDims >= 3) {
+        x += 0.5 * (basis[2][0] - b2inner[0]);
+        y += 0.5 * (basis[2][1] - b2inner[1]);
+        if ((v >> 2) & 1) {
+          x += b2inner[0];
+          y += b2inner[1];
+        }
+      }
     }
+
     for (let i = 0; i < n; i++) {
       if (i < cubeDims || i === nestDim) continue;
       if ((v >> i) & 1) {
@@ -405,7 +456,13 @@ export function positionsForSettings(settings, n) {
     ({ lengths, angles, stretchX } = szalkaiFaceSettings(settings));
   }
   const basis = basisVectors(angles, lengths, n, stretchX);
-  return projectedPositions(basis, NEST_DIM, settings.nestScale);
+  let innerDepthVec = null;
+  if (n > NEST_DIM && settings.innerDepth != null) {
+    const lengthsInner = lengths.slice();
+    lengthsInner[2] = Math.max(0, settings.innerDepth);
+    innerDepthVec = basisVectors(angles, lengthsInner, 3, stretchX)[2];
+  }
+  return projectedPositions(basis, NEST_DIM, settings.nestScale, innerDepthVec);
 }
 
 export function edgesByDimension(n) {

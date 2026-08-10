@@ -260,6 +260,101 @@ function buildDimControls() {
       note.style.cssText = "font-size:11px;color:var(--muted);margin-top:2px";
       note.textContent = "Same as Nest scale above";
       block.appendChild(note);
+    } else if (i === 2 && usesNestLayout() && n > NEST_DIM) {
+      // Two depth sliders: outer 3D cube vs nested (4th-dim) cube.
+      label.textContent = "Dim 3 — outer";
+      label.htmlFor = "len-2";
+      const min = 0;
+      const max = 200;
+      if (state.settings.innerDepth == null) {
+        state.settings.innerDepth =
+          state.settings.lengths[2] * state.settings.nestScale;
+      }
+      const range = document.createElement("input");
+      range.type = "range";
+      range.id = "len-2";
+      range.min = String(min);
+      range.max = String(max);
+      range.step = "1";
+      range.value = String(state.settings.lengths[2]);
+      num.id = "len-2-num";
+      num.min = String(min);
+      num.max = String(max);
+      num.step = "1";
+      num.value = String(Math.round(state.settings.lengths[2]));
+      num.setAttribute("aria-label", "Dim 3 outer depth length");
+      const syncOuter = (raw) => {
+        const v = Math.round(clamp(Number(raw), min, max));
+        state.settings.lengths[2] = v;
+        range.value = String(v);
+        num.value = String(v);
+        commitGeometry();
+        scheduleRedraw();
+        scheduleHash();
+      };
+      range.addEventListener("input", () => syncOuter(range.value));
+      num.addEventListener("change", () => syncOuter(num.value));
+      block.appendChild(range);
+
+      const innerBlock = document.createElement("div");
+      innerBlock.className = "slider-block dim-row";
+      innerBlock.dataset.dim = "2-inner";
+      const innerHead = document.createElement("div");
+      innerHead.className = "slider-head";
+      const innerChip = document.createElement("span");
+      innerChip.className = "chip";
+      innerChip.style.background = edgeColor(2);
+      const innerLabel = document.createElement("label");
+      innerLabel.textContent = "Dim 3 — nested (dim 4)";
+      innerLabel.htmlFor = "len-2-inner";
+      const innerNum = document.createElement("input");
+      innerNum.type = "number";
+      innerNum.className = "num";
+      innerNum.id = "len-2-inner-num";
+      innerNum.min = String(min);
+      innerNum.max = String(max);
+      innerNum.step = "1";
+      innerNum.value = String(Math.round(state.settings.innerDepth));
+      innerNum.setAttribute("aria-label", "Dim 3 nested cuboid depth length");
+      innerHead.append(innerChip, innerLabel, innerNum);
+      const innerRange = document.createElement("input");
+      innerRange.type = "range";
+      innerRange.id = "len-2-inner";
+      innerRange.min = String(min);
+      innerRange.max = String(max);
+      innerRange.step = "1";
+      innerRange.value = String(Math.round(state.settings.innerDepth));
+      const syncInner = (raw) => {
+        const v = Math.round(clamp(Number(raw), min, max));
+        state.settings.innerDepth = v;
+        innerRange.value = String(v);
+        innerNum.value = String(v);
+        commitGeometry();
+        scheduleRedraw();
+        scheduleHash();
+      };
+      innerRange.addEventListener("input", () => syncInner(innerRange.value));
+      innerNum.addEventListener("change", () => syncInner(innerNum.value));
+      innerBlock.append(innerHead, innerRange);
+
+      const bindDepthHover = (node) => {
+        node.addEventListener("pointerenter", () => {
+          state.highlightDim = 2;
+          block.classList.add("highlight-active");
+          innerBlock.classList.add("highlight-active");
+          scheduleRedraw();
+        });
+        node.addEventListener("pointerleave", () => {
+          state.highlightDim = null;
+          block.classList.remove("highlight-active");
+          innerBlock.classList.remove("highlight-active");
+          scheduleRedraw();
+        });
+      };
+      bindDepthHover(block);
+      bindDepthHover(innerBlock);
+      el.lengthSliders.appendChild(block);
+      el.lengthSliders.appendChild(innerBlock);
     } else {
       const min = i < 3 ? 10 : 40;
       const max = i < 3 ? 200 : 800;
@@ -302,21 +397,23 @@ function buildDimControls() {
       block.appendChild(range);
     }
 
-    const bindHover = (node) => {
-      node.addEventListener("pointerenter", () => {
-        state.highlightDim = i;
-        block.classList.add("highlight-active");
-        scheduleRedraw();
-      });
-      node.addEventListener("pointerleave", () => {
-        state.highlightDim = null;
-        block.classList.remove("highlight-active");
-        scheduleRedraw();
-      });
-    };
-    bindHover(block);
-
-    el.lengthSliders.appendChild(block);
+    const dualDepth = i === 2 && usesNestLayout() && n > NEST_DIM;
+    if (!dualDepth) {
+      const bindHover = (node) => {
+        node.addEventListener("pointerenter", () => {
+          state.highlightDim = i;
+          block.classList.add("highlight-active");
+          scheduleRedraw();
+        });
+        node.addEventListener("pointerleave", () => {
+          state.highlightDim = null;
+          block.classList.remove("highlight-active");
+          scheduleRedraw();
+        });
+      };
+      bindHover(block);
+      el.lengthSliders.appendChild(block);
+    }
 
     // Angle
     const ablock = document.createElement("div");
@@ -1056,6 +1153,7 @@ function serializeSettings() {
     pr: currentProjection(),
     n: s.n,
     ns: s.nestScale,
+    id: s.innerDepth,
     sx: s.stretchX,
     sw: s.strokeWidth,
     vr: s.vertexRadius,
@@ -1087,6 +1185,9 @@ function applySerialized(data) {
   if (Array.isArray(data.V) && data.V.length === 7) s.visible = data.V.map(Boolean);
   if (Array.isArray(data.C) && data.C.length >= s.n) s.edgeColors = data.C;
   if (data.ps) s.pngScale = Number(data.ps);
+  // Inner depth: explicit value, else keep classic nestScale × outer depth.
+  if (data.id != null) s.innerDepth = Number(data.id);
+  else s.innerDepth = s.lengths[2] * s.nestScale;
   state.settings = s;
 }
 
