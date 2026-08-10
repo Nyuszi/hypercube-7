@@ -57,7 +57,8 @@ function currentProjection() {
 }
 
 function usesNestLayout() {
-  return currentProjection() === "nested";
+  const p = currentProjection();
+  return p === "nested" || p === "szalkai";
 }
 
 function updateProjectionUi() {
@@ -73,11 +74,11 @@ function updateProjectionUi() {
     if (proj === "szalkai") {
       el.projectionHint.hidden = false;
       el.projectionHint.textContent =
-        "Szalkai view: parallel copy-and-offset layout with square-faced unit cubes packed into a rectangle (after Dr. István Szalkai). Dims 1–2 stay equal.";
+        "Szalkai view: nested layout with a square user-facing face. Dim 4 puts a smaller rectangle in the same plane inside the larger outer one (same on the far side). Dims 1–2 stay equal.";
     } else if (proj === "petrie") {
       el.projectionHint.hidden = false;
       el.projectionHint.textContent =
-        "Petrie view: Coxeter-plane projection — equal lengths give a regular 2n-gon outline. Nest scale applies only to Nested.";
+        "Petrie view: Coxeter-plane projection — equal lengths give a regular 2n-gon outline. Nest scale applies only to Nested / Szalkai.";
     } else {
       el.projectionHint.hidden = true;
       el.projectionHint.textContent = "";
@@ -86,8 +87,8 @@ function updateProjectionUi() {
   if (el.mathProjectionNote) {
     if (proj === "szalkai") {
       el.mathProjectionNote.innerHTML =
-        "This drawing is a <strong>Szalkai rectangle</strong> layout of <span class=\"math-sym\">Q<sub>n</sub></span> " +
-        "(parallel shelves of square-faced cubes), not a literal view of <span class=\"math-sym\">n</span>-space.";
+        "This drawing is a <strong>Szalkai</strong> nested projection of <span class=\"math-sym\">Q<sub>n</sub></span> " +
+        "(square user-facing face; dim&nbsp;4 nests a smaller coplanar rectangle inside a larger outer one), not a literal view of <span class=\"math-sym\">n</span>-space.";
     } else if (proj === "petrie") {
       el.mathProjectionNote.innerHTML =
         "This drawing is a <strong>Petrie projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
