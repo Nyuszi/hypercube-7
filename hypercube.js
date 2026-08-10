@@ -4,6 +4,8 @@
  */
 
 export const NEST_DIM = 3;
+/** Szalkai nests at the 3rd dimension (cube = square inside square); higher dims offset. */
+export const SZALKAI_NEST_DIM = 2;
 export const MARGIN = 26;
 
 /** Drawing modes (2D layouts of the same Qₙ graph). */
@@ -16,7 +18,7 @@ export const PROJECTIONS = {
   szalkai: {
     id: "szalkai",
     label: "Szalkai",
-    short: "Szalkai nested square",
+    short: "Szalkai Hₙ construction",
   },
   petrie: {
     id: "petrie",
@@ -29,7 +31,7 @@ export const PROJECTIONS = {
 export const DEFAULT_BASIS_POLAR = [
   [8.0, 72.0],
   [98.0, 52.0],
-  [148.0, 58.0],
+  [148.0, 104.0], // dim 3 = 2 × dim 2
   [0.0, 1.0],
   [6.0, 300.0],
   [78.0, 230.0],
@@ -37,15 +39,14 @@ export const DEFAULT_BASIS_POLAR = [
 ];
 
 /**
- * Szalkai = nested / Schlegel layout with a square user-facing face
- * (dims 0–1 equal & orthogonal). Dim 4 nests a smaller coplanar rectangle
- * inside the larger outer one (and the same on the far side).
+ * Szalkai = nested square for the 3rd dim (H₃), then parallel offsets for dim ≥ 4 (H₄…).
+ * User-facing face is a square; dim 2 grows upward like Szalkai’s H₂ figure.
  */
 export const SZALKAI_BASIS_POLAR = [
-  [0.0, 72.0],
-  [90.0, 72.0],
-  [135.0, 48.0],
-  [0.0, 1.0],
+  [0.0, 72.0],     // dim 1 — right
+  [-90.0, 72.0],   // dim 2 — up
+  [0.0, 1.0],      // dim 3 — nest (scale); length unused
+  [-30.0, 144.0],  // dim 4 — ~30° up-right bridge (Szalkai H₄)
   [6.0, 300.0],
   [78.0, 230.0],
   [108.0, 470.0],
@@ -61,6 +62,17 @@ export const DIM_LABELS = [
   "Dim 2 — cuboid height",
   "Dim 3 — cuboid depth",
   "Dim 4 — nest (inner cuboid)",
+  "Dim 5 — shelf offset",
+  "Dim 6 — layer offset",
+  "Dim 7 — long bridge",
+];
+
+/** Szalkai labels: dim 3 nests the face; dim 4+ are parallel copies. */
+export const SZALKAI_DIM_LABELS = [
+  "Dim 1 — right",
+  "Dim 2 — up",
+  "Dim 3 — nest (inner square)",
+  "Dim 4 — H₃ offset",
   "Dim 5 — shelf offset",
   "Dim 6 — layer offset",
   "Dim 7 — long bridge",
@@ -213,21 +225,18 @@ export function systemDefaultPalette() {
 }
 
 export function defaultSettings() {
-  const lengths = DEFAULT_BASIS_POLAR.map(([, len]) => len);
   return {
     palette: systemDefaultPalette(),
     projection: "nested",
     n: 7,
     nestScale: DEFAULT_NEST_SCALE,
-    /** Dim-3 edge length on the nested (4th-dim) cuboid; independent of outer depth. */
-    innerDepth: lengths[2] * DEFAULT_NEST_SCALE,
     stretchX: 1.45,
     strokeWidth: 0.9,
     vertexRadius: 1.5,
     showVertices: true,
     showLabels: false,
     glow: 0,
-    lengths,
+    lengths: DEFAULT_BASIS_POLAR.map(([, len]) => len),
     angles: DEFAULT_BASIS_POLAR.map(([deg]) => deg),
     visible: [true, true, true, true, true, true, true],
     edgeColors: null, // null = use palette; else length-7 array
@@ -244,7 +253,6 @@ export function applyProjectionDefaults(settings, projection) {
     s.angles = SZALKAI_BASIS_POLAR.map(([deg]) => deg);
     s.stretchX = 1;
     s.nestScale = DEFAULT_NEST_SCALE;
-    s.innerDepth = s.lengths[2] * s.nestScale;
   } else if (s.projection === "petrie") {
     s.lengths = Array(7).fill(PETRIE_EDGE);
   } else {
@@ -252,21 +260,27 @@ export function applyProjectionDefaults(settings, projection) {
     s.angles = DEFAULT_BASIS_POLAR.map(([deg]) => deg);
     s.nestScale = DEFAULT_NEST_SCALE;
     s.stretchX = 1.45;
-    s.innerDepth = s.lengths[2] * s.nestScale;
   }
   return s;
 }
 
-/** Enforce Szalkai’s square user-facing face on a copy of lengths/angles. */
+/**
+ * Szalkai: orthogonal face — dim 1 right (0°), dim 2 up (−90° in SVG).
+ * Side lengths left free during n-morphs; UI keeps them equal when editing.
+ */
 export function szalkaiFaceSettings(settings) {
   const lengths = settings.lengths.slice();
   const angles = settings.angles.slice();
-  const side = Number.isFinite(lengths[0]) ? Math.max(0, lengths[0]) : 72;
-  lengths[0] = side;
-  lengths[1] = side;
+  lengths[0] = Number.isFinite(lengths[0]) ? Math.max(0, lengths[0]) : 72;
+  lengths[1] = Number.isFinite(lengths[1]) ? Math.max(0, lengths[1]) : lengths[0];
   angles[0] = 0;
-  angles[1] = 90;
+  angles[1] = -90;
   return { lengths, angles, stretchX: 1 };
+}
+
+/** Nest-bit index for the active projection. */
+export function nestDimForProjection(projection) {
+  return projection === "szalkai" ? SZALKAI_NEST_DIM : NEST_DIM;
 }
 
 /** Relative luminance of a #rrggbb (or #rgb) color; used for label contrast. */
@@ -293,9 +307,8 @@ export function referencePreset() {
   s.stretchX = 1.2;
   s.nestScale = 0.42;
   s.glow = 0;
-  s.lengths = [72, 52, 58, 1, 300, 230, 470];
+  s.lengths = [72, 52, 104, 1, 300, 230, 470];
   s.angles = [8, 98, 148, 0, 6, 78, 108];
-  s.innerDepth = s.lengths[2] * s.nestScale;
   return s;
 }
 
@@ -360,25 +373,24 @@ export function petrieBasisVectors(lengths, n, angleN = n) {
 
 /**
  * Nested / Schlegel projection.
- * @param {[number, number]|null} innerDepthVec Dim-3 basis vector for the nested
- *   cuboid. When null, depth scales with nestScale (classic uniform nest).
+ *
+ * nestDim = 3 (Nested view): 3D cuboid with face nesting; dim-3 depth stays 1:1;
+ *   outer = nest-bit 0, inner = nest-bit 1.
+ * nestDim = 2 (Szalkai): square face nests inward (H₃); dims ≥ 4 are parallel offsets (H₄).
  */
 export function projectedPositions(
   basis,
   nestDim = NEST_DIM,
   nestScale = DEFAULT_NEST_SCALE,
-  innerDepthVec = null,
 ) {
   const n = basis.length;
-  const cubeDims = Math.min(3, n);
-  const hasCustomDepth =
-    cubeDims >= 3 && Array.isArray(innerDepthVec) && innerDepthVec.length >= 2;
-  const b2inner = hasCustomDepth
-    ? [innerDepthVec[0], innerDepthVec[1]]
-    : null;
+  // Nested: cube = dims 0..2. Szalkai: face = dims 0..1 (nest bit is dim 2).
+  const cubeDims = Math.min(nestDim, n);
+  const matchDepth = nestDim >= 3 && n > nestDim && cubeDims >= 3;
 
   const positions = [];
   for (let v = 0; v < 1 << n; v++) {
+    // Outer = nest-bit 0 (0…); inner = nest-bit 1 (1…) — Szalkai H₃ convention.
     const nested = n > nestDim && ((v >> nestDim) & 1) === 1;
     let x = 0;
     let y = 0;
@@ -390,8 +402,8 @@ export function projectedPositions(
           y += basis[i][1];
         }
       }
-    } else if (!hasCustomDepth) {
-      // Classic uniform homothety toward the cube center.
+    } else if (!matchDepth) {
+      // Uniform nest of the face/cube (Szalkai H₃, or classic 3-cube nest).
       const center = [0, 0];
       for (let i = 0; i < cubeDims; i++) {
         center[0] += basis[i][0] * 0.5;
@@ -406,8 +418,7 @@ export function projectedPositions(
       x = center[0] + nestScale * (x - center[0]);
       y = center[1] + nestScale * (y - center[1]);
     } else {
-      // Face (dims 0–1) uses nestScale; depth uses the custom inner vector.
-      // When innerDepthVec === nestScale * basis[2], this matches classic nest.
+      // Nested view: nest the face; keep dim-3 depth equal to the outer cube (1:1).
       for (let i = 0; i < Math.min(2, cubeDims); i++) {
         if ((v >> i) & 1) {
           x += basis[i][0] * nestScale;
@@ -416,13 +427,9 @@ export function projectedPositions(
         x += basis[i][0] * 0.5 * (1 - nestScale);
         y += basis[i][1] * 0.5 * (1 - nestScale);
       }
-      if (cubeDims >= 3) {
-        x += 0.5 * (basis[2][0] - b2inner[0]);
-        y += 0.5 * (basis[2][1] - b2inner[1]);
-        if ((v >> 2) & 1) {
-          x += b2inner[0];
-          y += b2inner[1];
-        }
+      if ((v >> 2) & 1) {
+        x += basis[2][0];
+        y += basis[2][1];
       }
     }
 
@@ -447,8 +454,6 @@ export function positionsForSettings(settings, n) {
       settings.petrieAngleN != null ? settings.petrieAngleN : n;
     return linearPositions(petrieBasisVectors(settings.lengths, n, angleN));
   }
-  // Nested + Szalkai share Schlegel nesting; Szalkai locks a square user-facing face.
-  // Dim 4 nests a smaller coplanar rectangle inside the larger outer one.
   let angles = settings.angles;
   let lengths = settings.lengths;
   let stretchX = settings.stretchX;
@@ -456,13 +461,11 @@ export function positionsForSettings(settings, n) {
     ({ lengths, angles, stretchX } = szalkaiFaceSettings(settings));
   }
   const basis = basisVectors(angles, lengths, n, stretchX);
-  let innerDepthVec = null;
-  if (n > NEST_DIM && settings.innerDepth != null) {
-    const lengthsInner = lengths.slice();
-    lengthsInner[2] = Math.max(0, settings.innerDepth);
-    innerDepthVec = basisVectors(angles, lengthsInner, 3, stretchX)[2];
-  }
-  return projectedPositions(basis, NEST_DIM, settings.nestScale, innerDepthVec);
+  return projectedPositions(
+    basis,
+    nestDimForProjection(proj),
+    settings.nestScale,
+  );
 }
 
 export function edgesByDimension(n) {
@@ -491,10 +494,10 @@ function meanEdgeLength(pos, edges) {
 /**
  * Build an SVG element (or string) for the current settings.
  * @param {object} settings
- * @param {{ highlightDim?: number|null, asString?: boolean }} options
+ * @param {{ highlightDim?: number|null, asString?: boolean, labelMorph?: { fromN: number, toN: number, t: number }|null }} options
  */
 export function buildHypercubeSvg(settings, options = {}) {
-  const { highlightDim = null, asString = false } = options;
+  const { highlightDim = null, asString = false, labelMorph = null } = options;
   const n = Math.max(0, Math.min(7, settings.n | 0));
   const palette = resolvePalette({ ...settings, n });
   let pos = positionsForSettings(settings, n);
@@ -590,8 +593,33 @@ export function buildHypercubeSvg(settings, options = {}) {
   svg.appendChild(edgesRoot);
 
   const drawVerts = n === 0 || (settings.showVertices && settings.vertexRadius > 0);
+  const hitR = Math.max(
+    n === 0 ? 8 : 7,
+    (settings.vertexRadius || 0) * 2.2,
+  );
+  // Invisible hit targets so hover works even when vertices are tiny / hidden,
+  // and despite the stage pan cursor + CSS transform (native <title> fails there).
+  if (!asString) {
+    const hg = document.createElementNS(NS, "g");
+    hg.setAttribute("class", "vertex-hits");
+    hg.setAttribute("fill", "transparent");
+    hg.setAttribute("stroke", "none");
+    for (let v = 0; v < pos.length; v++) {
+      const [x, y] = pos[v];
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("cx", x.toFixed(2));
+      c.setAttribute("cy", y.toFixed(2));
+      c.setAttribute("r", String(hitR));
+      c.setAttribute("data-vertex", String(v));
+      c.setAttribute("data-label", toBinaryLabel(v, n));
+      hg.appendChild(c);
+    }
+    svg.appendChild(hg);
+  }
+
   if (drawVerts) {
     const vg = document.createElementNS(NS, "g");
+    vg.setAttribute("class", "vertex-dots");
     vg.setAttribute("fill", palette.vertex);
     if (palette.vertexStroke && palette.vertexStroke !== "none") {
       vg.setAttribute("stroke", palette.vertexStroke);
@@ -606,9 +634,7 @@ export function buildHypercubeSvg(settings, options = {}) {
       c.setAttribute("cx", x.toFixed(2));
       c.setAttribute("cy", y.toFixed(2));
       c.setAttribute("r", String(r));
-      const tip = document.createElementNS(NS, "title");
-      tip.textContent = toBinaryLabel(v, n);
-      c.appendChild(tip);
+      c.setAttribute("pointer-events", "none");
       vg.appendChild(c);
     }
     svg.appendChild(vg);
@@ -616,6 +642,8 @@ export function buildHypercubeSvg(settings, options = {}) {
 
   if (settings.showLabels) {
     const lg = document.createElementNS(NS, "g");
+    lg.setAttribute("class", "vertex-labels");
+    lg.setAttribute("pointer-events", "none");
     const labelFill = labelColorForBackground(palette.background);
     const fontSize = Math.max(3.2, Math.min(8.5, 15 - n * 1.1));
     lg.setAttribute("fill", labelFill);
@@ -624,12 +652,52 @@ export function buildHypercubeSvg(settings, options = {}) {
     lg.setAttribute("text-anchor", "middle");
     lg.setAttribute("dominant-baseline", "hanging");
     lg.setAttribute("opacity", "0.92");
+    const morph =
+      labelMorph &&
+      Number.isFinite(labelMorph.t) &&
+      labelMorph.fromN !== labelMorph.toN
+        ? labelMorph
+        : null;
+
     for (let v = 0; v < pos.length; v++) {
       const [x, y] = pos[v];
       const t = document.createElementNS(NS, "text");
       t.setAttribute("x", x.toFixed(2));
       t.setAttribute("y", (y + settings.vertexRadius + 1.2).toFixed(2));
-      t.textContent = toBinaryLabel(v, n);
+      if (morph) {
+        const glyphs = morphBinaryGlyphs(
+          v,
+          morph.fromN,
+          morph.toN,
+          morph.t,
+        );
+        t.setAttribute("text-anchor", "middle");
+        let rowOpacity = 1;
+        if (morph.toN > morph.fromN && morph.fromN > 0 && v >= 1 << morph.fromN) {
+          rowOpacity = 0.15 + 0.85 * morph.t;
+        } else if (
+          morph.toN < morph.fromN &&
+          (morph.toN > 0 ? v >> morph.toN : v) !== 0
+        ) {
+          rowOpacity = Math.max(0, 1 - morph.t);
+        }
+        t.setAttribute("opacity", String(rowOpacity));
+        for (const g of glyphs) {
+          if (g.opacity < 0.02) continue;
+          const span = document.createElementNS(NS, "tspan");
+          span.textContent = g.ch;
+          span.setAttribute(
+            "opacity",
+            String(Math.max(0, Math.min(1, g.opacity))),
+          );
+          span.setAttribute("font-size", (fontSize * (g.scale || 1)).toFixed(2));
+          if (g.kind === "in") span.setAttribute("class", "bit-in");
+          if (g.kind === "out") span.setAttribute("class", "bit-out");
+          t.appendChild(span);
+        }
+      } else {
+        t.textContent = toBinaryLabel(v, n);
+      }
       lg.appendChild(t);
     }
     svg.appendChild(lg);
@@ -641,10 +709,97 @@ export function buildHypercubeSvg(settings, options = {}) {
   return { svg, width, height, background: palette.background };
 }
 
-/** Binary address of a vertex (bit 0 = least significant = dimension 1). */
+/**
+ * Binary address of a vertex.
+ * Written MSB→LSB left to right: leftmost bit = dimension n, rightmost = dimension 1.
+ * Example n=4: 0001 = dim1, 0010 = dim2, 0100 = dim3, 1000 = dim4.
+ */
 export function toBinaryLabel(v, n) {
   if (n <= 0) return "∅";
   return v.toString(2).padStart(n, "0");
+}
+
+/**
+ * Glyphs for animating label morphs when n changes (e.g. 0 → 00, 1 → 01).
+ * Leading bits are the newest dimension (prepended on the left).
+ * @returns {{ ch: string, opacity: number, scale: number, kind: string }[]}
+ */
+export function morphBinaryGlyphs(v, fromN, toN, t) {
+  const e = Math.min(1, Math.max(0, Number(t) || 0));
+  const a = Math.max(0, fromN | 0);
+  const b = Math.max(0, toN | 0);
+
+  if (a === b) {
+    const s = toBinaryLabel(v, b);
+    return [...s].map((ch) => ({ ch, opacity: 1, scale: 1, kind: "keep" }));
+  }
+
+  // Growing: new high bits fade/scale in on the left; survivors keep old bits.
+  if (b > a) {
+    const final = toBinaryLabel(v, b);
+    const added = b - a;
+    const onOriginal = a === 0 ? v === 0 : v < 1 << a;
+    const glyphs = [];
+
+    if (a === 0 && e < 0.55) {
+      // ∅ dissolves into the first bit.
+      const voidFade = 1 - e / 0.55;
+      glyphs.push({
+        ch: "∅",
+        opacity: voidFade,
+        scale: 0.85 + 0.15 * voidFade,
+        kind: "out",
+      });
+    }
+
+    for (let i = 0; i < final.length; i++) {
+      const isNew = i < added;
+      let opacity = 1;
+      let scale = 1;
+      let kind = "keep";
+      if (a === 0) {
+        const birth = Math.max(0, (e - 0.2) / 0.8);
+        opacity = birth;
+        scale = 0.4 + 0.6 * birth;
+        kind = "in";
+      } else if (onOriginal) {
+        if (isNew) {
+          opacity = e;
+          scale = 0.3 + 0.7 * e;
+          kind = "in";
+        }
+      } else {
+        opacity = 0.12 + 0.88 * e;
+        scale = 0.45 + 0.55 * e;
+        kind = "in";
+      }
+      glyphs.push({ ch: final[i], opacity, scale, kind });
+    }
+    return glyphs;
+  }
+
+  // Shrinking: high bits peel off; copies with those bits set fade away.
+  const start = toBinaryLabel(v, a);
+  const removed = a - b;
+  const high = b > 0 ? v >> b : v;
+  const disappearing = high !== 0;
+  if (disappearing) {
+    return [...start].map((ch) => ({
+      ch,
+      opacity: Math.max(0, 1 - e),
+      scale: 1 - 0.35 * e,
+      kind: "out",
+    }));
+  }
+  return [...start].map((ch, i) => {
+    const leaving = i < removed;
+    return {
+      ch,
+      opacity: leaving ? Math.max(0, 1 - e) : 1,
+      scale: leaving ? Math.max(0.25, 1 - 0.6 * e) : 1,
+      kind: leaving ? "out" : "keep",
+    };
+  });
 }
 
 export function graphStats(n) {

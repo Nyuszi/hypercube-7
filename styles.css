@@ -206,6 +206,10 @@ select.field {
   cursor: grabbing;
 }
 
+.stage.hover-vertex {
+  cursor: help;
+}
+
 .stage-inner {
   transform-origin: 0 0;
   will-change: transform;
@@ -217,12 +221,46 @@ select.field {
   max-width: none;
 }
 
+.stage-inner svg .vertex-hits {
+  pointer-events: all;
+}
+
+.stage-inner svg .vertex-labels,
+.stage-inner svg .vertex-dots {
+  pointer-events: none;
+}
+
+.vertex-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 10px));
+  background: rgba(22, 26, 34, 0.94);
+  color: #e8ecf2;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.vertex-tip[hidden] {
+  display: none;
+}
+
 .stage-inner.dim-animating svg line {
   transition: opacity 0.05s linear;
 }
 
-.stage-inner.dim-animating svg g[data-dimension] {
-  transition: opacity 0.08s linear;
+.stage-inner.dim-animating svg g.vertex-labels .bit-in {
+  font-weight: 600;
+}
+
+.stage-inner.dim-animating svg g.vertex-labels .bit-out {
+  font-style: italic;
 }
 
 .stage-hud {

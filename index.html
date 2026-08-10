@@ -14,37 +14,46 @@
 <body>
   <div id="app">
     <header class="topbar">
-      <div class="brand">Hypercube <span id="brand-n">Q₇</span></div>
+      <div class="brand"><span data-i18n="brand">Hypercube</span> <span id="brand-n">Q₇</span></div>
 
       <div class="select-wrap">
-        <label for="projection">View</label>
-        <select id="projection" class="field" aria-label="Projection view">
-          <option value="nested">Nested</option>
-          <option value="szalkai">Szalkai</option>
-          <option value="petrie">Petrie</option>
+        <label for="projection" data-i18n="view">View</label>
+        <select id="projection" class="field" data-i18n-attr-aria-label="view.aria">
+          <option value="nested" data-i18n="view.nested">Nested</option>
+          <option value="szalkai" data-i18n="view.szalkai">Szalkai</option>
+          <option value="petrie" data-i18n="view.petrie">Petrie</option>
         </select>
       </div>
 
       <div class="select-wrap">
-        <label for="palette">Style</label>
-        <select id="palette" class="field" aria-label="Color style"></select>
+        <label for="palette" data-i18n="style">Style</label>
+        <select id="palette" class="field" data-i18n-attr-aria-label="style.aria"></select>
         <div class="palette-swatches" id="palette-swatches" aria-hidden="true"></div>
+      </div>
+
+      <div class="select-wrap">
+        <label for="locale" data-i18n="lang.label">Language</label>
+        <select id="locale" class="field" data-i18n-attr-aria-label="lang.label">
+          <option value="system" data-i18n="lang.system">System</option>
+          <option value="en" data-i18n="lang.en">English</option>
+          <option value="hu" data-i18n="lang.hu">Hungarian</option>
+        </select>
       </div>
 
       <div class="topbar-actions">
         <div class="select-wrap png-wrap">
-          <label for="png-scale">PNG</label>
-          <select id="png-scale" class="field" aria-label="Screenshot scale">
+          <label for="png-scale" data-i18n="png">PNG</label>
+          <select id="png-scale" class="field" data-i18n-attr-aria-label="png.aria">
             <option value="1">1×</option>
             <option value="2" selected>2×</option>
             <option value="3">3×</option>
           </select>
         </div>
-        <button type="button" class="btn" id="btn-screenshot" title="Screenshot (S)">Screenshot</button>
-        <button type="button" class="btn" id="btn-export" title="Export SVG (E)">Export SVG</button>
-        <button type="button" class="btn" id="btn-copy-link" title="Copy shareable link">Copy link</button>
-        <button type="button" class="btn primary" id="btn-reset" title="Reset (R)">Reset</button>
-        <button type="button" class="btn primary btn-controls" id="btn-controls" aria-controls="sidebar" aria-expanded="false">
+        <button type="button" class="btn" id="btn-screenshot" data-i18n="btn.screenshot" data-i18n-attr-title="btn.screenshot.title">Screenshot</button>
+        <button type="button" class="btn" id="btn-export" data-i18n="btn.export" data-i18n-attr-title="btn.export.title">Export SVG</button>
+        <button type="button" class="btn" id="btn-copy-link" data-i18n="btn.copyLink" data-i18n-attr-title="btn.copyLink.title">Copy link</button>
+        <button type="button" class="btn primary" id="btn-reset" data-i18n="btn.reset" data-i18n-attr-title="btn.reset.title">Reset</button>
+        <button type="button" class="btn primary btn-controls" id="btn-controls" aria-controls="sidebar" aria-expanded="false" data-i18n="btn.controls">
           Controls
         </button>
       </div>
@@ -56,39 +65,40 @@
           <div class="stage-inner" id="stage-inner"></div>
         </div>
         <div class="stage-hud">
-          <button type="button" class="btn" id="btn-fit">Fit</button>
-          <button type="button" class="btn" id="btn-zoom-in" aria-label="Zoom in">+</button>
-          <button type="button" class="btn" id="btn-zoom-out" aria-label="Zoom out">−</button>
+          <button type="button" class="btn" id="btn-fit" data-i18n="btn.fit">Fit</button>
+          <button type="button" class="btn" id="btn-zoom-in" data-i18n-attr-aria-label="btn.zoomIn">+</button>
+          <button type="button" class="btn" id="btn-zoom-out" data-i18n-attr-aria-label="btn.zoomOut">−</button>
         </div>
         <div class="hint">
-          <span class="hint-desktop">Scroll to zoom · drag to pan</span>
-          <span class="hint-mobile">Pinch to zoom · drag to pan</span>
+          <span class="hint-desktop" data-i18n="hint.desktop">Scroll to zoom · drag to pan</span>
+          <span class="hint-mobile" data-i18n="hint.mobile">Pinch to zoom · drag to pan</span>
         </div>
+        <div id="vertex-tip" class="vertex-tip" hidden></div>
       </div>
 
       <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-mobile-bar">
-          <strong>Controls</strong>
-          <button type="button" class="btn" id="btn-controls-close" aria-label="Close controls">Done</button>
+          <strong data-i18n="btn.controls">Controls</strong>
+          <button type="button" class="btn" id="btn-controls-close" data-i18n="btn.controlsDone" data-i18n-attr-aria-label="btn.controlsClose">Done</button>
         </div>
         <div class="mobile-export">
           <div class="select-wrap">
-            <label for="png-scale-mobile">PNG</label>
-            <select id="png-scale-mobile" class="field" aria-label="Screenshot scale">
+            <label for="png-scale-mobile" data-i18n="png">PNG</label>
+            <select id="png-scale-mobile" class="field" data-i18n-attr-aria-label="png.aria">
               <option value="1">1×</option>
               <option value="2" selected>2×</option>
               <option value="3">3×</option>
             </select>
           </div>
-          <button type="button" class="btn" id="btn-screenshot-mobile">Screenshot</button>
-          <button type="button" class="btn" id="btn-export-mobile">Export SVG</button>
-          <button type="button" class="btn" id="btn-copy-link-mobile">Copy link</button>
-          <button type="button" class="btn primary" id="btn-reset-mobile">Reset</button>
+          <button type="button" class="btn" id="btn-screenshot-mobile" data-i18n="btn.screenshot">Screenshot</button>
+          <button type="button" class="btn" id="btn-export-mobile" data-i18n="btn.export">Export SVG</button>
+          <button type="button" class="btn" id="btn-copy-link-mobile" data-i18n="btn.copyLink">Copy link</button>
+          <button type="button" class="btn primary" id="btn-reset-mobile" data-i18n="btn.reset">Reset</button>
         </div>
         <section class="section math-panel">
-          <h2>Math</h2>
-          <p class="math-def">
+          <h2 data-i18n="section.math">Math</h2>
+          <p class="math-def" data-i18n-html="math.def">
             The <strong>hypercube graph</strong> <span class="math-sym" id="math-qn">Q<sub>7</sub></span>
             has vertex set <span class="math-sym">{0,1}<sup>n</sup></span>
             (binary strings of length <span class="math-sym">n</span>).
@@ -97,96 +107,88 @@
             <span class="math-sym">Q<sub>0</sub></span> is a single vertex.
           </p>
           <dl class="math-stats" id="math-stats">
-            <div><dt>Vertices</dt><dd id="stat-vertices">128</dd></div>
-            <div><dt>Edges</dt><dd id="stat-edges">448</dd></div>
-            <div><dt>Degree</dt><dd id="stat-degree">7</dd></div>
+            <div><dt data-i18n="math.vertices">Vertices</dt><dd id="stat-vertices">128</dd></div>
+            <div><dt data-i18n="math.edges">Edges</dt><dd id="stat-edges">448</dd></div>
+            <div><dt data-i18n="math.degree">Degree</dt><dd id="stat-degree">7</dd></div>
           </dl>
           <ul class="math-notes">
-            <li>Equal-color edges flip the same bit — one dimension.</li>
-            <li>The graph is bipartite (partition by parity of the number of 1-bits).</li>
-            <li>Hamilton paths correspond to Gray codes on <span class="math-sym">n</span> bits.</li>
-            <li id="math-projection-note">This drawing is a <strong>2D projection</strong> of <span class="math-sym">Q<sub>n</sub></span>,
+            <li data-i18n="math.note1">Equal-color edges flip the same bit — one dimension.</li>
+            <li data-i18n="math.note2">The graph is bipartite (partition by parity of the number of 1-bits).</li>
+            <li data-i18n-html="math.note3">Hamilton paths correspond to Gray codes on <span class="math-sym">n</span> bits.</li>
+            <li id="math-projection-note" data-i18n-html="math.proj.nested">This drawing is a <strong>2D projection</strong> of <span class="math-sym">Q<sub>n</sub></span>,
               not a literal view of <span class="math-sym">n</span>-space.</li>
           </ul>
           <div class="toggle-row">
             <input type="checkbox" id="show-labels">
-            <label for="show-labels">Binary labels on vertices</label>
+            <label for="show-labels" data-i18n="math.labels">Binary labels on vertices</label>
           </div>
-          <p class="math-hint">Hover a vertex for its binary address even when labels are off.</p>
+          <p class="math-hint" data-i18n-html="math.hint">Hover a vertex for its binary address even when labels are off. Bits read left→right as dim&nbsp;<span class="math-sym">n</span> … dim&nbsp;1 (rightmost bit flips with dim&nbsp;1 edges).</p>
         </section>
 
         <section class="section">
-          <h2>Structure</h2>
+          <h2 data-i18n="section.structure">Structure</h2>
           <div class="slider-block">
             <div class="slider-head">
-              <label for="n">Dimensions</label>
-              <input type="number" class="num" id="n-num" min="0" max="7" step="1" value="7" aria-label="Dimensions value">
+              <label for="n" data-i18n="struct.dimensions">Dimensions</label>
+              <input type="number" class="num" id="n-num" min="0" max="7" step="1" value="7" data-i18n-attr-aria-label="struct.dimensionsValue">
             </div>
             <input type="range" id="n" min="0" max="7" step="1" value="7">
           </div>
-          <div class="slider-block nest-layout-only">
-            <div class="slider-head">
-              <label for="nest-scale">Nest scale (dim 4)</label>
-              <input type="number" class="num" id="nest-scale-num" min="0.15" max="0.85" step="0.01" value="0.42" aria-label="Nest scale value">
-            </div>
-            <input type="range" id="nest-scale" min="0.15" max="0.85" step="0.01" value="0.42">
-          </div>
           <div class="slider-block nested-only">
             <div class="slider-head">
-              <label for="stretch-x">Horizontal stretch</label>
-              <input type="number" class="num" id="stretch-x-num" min="0.6" max="2.5" step="0.01" value="1.45" aria-label="Horizontal stretch value">
+              <label for="stretch-x" data-i18n="struct.stretch">Horizontal stretch</label>
+              <input type="number" class="num" id="stretch-x-num" min="0.6" max="2.5" step="0.01" value="1.45" data-i18n-attr-aria-label="struct.stretchValue">
             </div>
             <input type="range" id="stretch-x" min="0.6" max="2.5" step="0.01" value="1.45">
           </div>
-          <p class="control-note" id="projection-hint" hidden></p>
         </section>
 
         <section class="section">
-          <h2>Line lengths</h2>
+          <h2 data-i18n="section.lengths">Line lengths</h2>
           <div id="length-sliders"></div>
           <details class="advanced nested-only">
-            <summary>Advanced angles</summary>
+            <summary data-i18n="lengths.advanced">Advanced angles</summary>
             <div id="angle-sliders"></div>
           </details>
         </section>
 
         <section class="section">
-          <h2>Style</h2>
+          <h2 data-i18n="section.style">Style</h2>
           <div class="toggle-row">
             <input type="checkbox" id="show-vertices" checked>
-            <label for="show-vertices">Show vertices</label>
+            <label for="show-vertices" data-i18n="style.showVertices">Show vertices</label>
           </div>
           <div class="slider-block">
             <div class="slider-head">
-              <label for="vertex-radius">Vertex radius</label>
-              <input type="number" class="num" id="vertex-radius-num" min="0" max="6" step="0.1" value="1.5" aria-label="Vertex radius value">
+              <label for="vertex-radius" data-i18n="style.vertexRadius">Vertex radius</label>
+              <input type="number" class="num" id="vertex-radius-num" min="0" max="6" step="0.1" value="1.5" data-i18n-attr-aria-label="style.vertexRadiusValue">
             </div>
             <input type="range" id="vertex-radius" min="0" max="6" step="0.1" value="1.5">
           </div>
           <div class="slider-block">
             <div class="slider-head">
-              <label for="stroke-width">Stroke width</label>
-              <input type="number" class="num" id="stroke-width-num" min="0.2" max="4" step="0.05" value="0.9" aria-label="Stroke width value">
+              <label for="stroke-width" data-i18n="style.stroke">Stroke width</label>
+              <input type="number" class="num" id="stroke-width-num" min="0.2" max="4" step="0.05" value="0.9" data-i18n-attr-aria-label="style.strokeValue">
             </div>
             <input type="range" id="stroke-width" min="0.2" max="4" step="0.05" value="0.9">
           </div>
           <div class="slider-block">
             <div class="slider-head">
-              <label for="glow">Glow</label>
-              <input type="number" class="num" id="glow-num" min="0" max="8" step="0.1" value="0" aria-label="Glow value">
+              <label for="glow" data-i18n="style.glow">Glow</label>
+              <input type="number" class="num" id="glow-num" min="0" max="8" step="0.1" value="0" data-i18n-attr-aria-label="style.glowValue">
             </div>
             <input type="range" id="glow" min="0" max="8" step="0.1" value="0">
           </div>
         </section>
 
         <section class="section">
-          <h2>Presets</h2>
+          <h2 data-i18n="section.presets">Presets</h2>
           <div class="preset-row">
-            <button type="button" class="btn" id="btn-preset-ref">Reference-like</button>
+            <button type="button" class="btn" id="btn-preset-ref" data-i18n="preset.reference">Reference-like</button>
           </div>
           <div class="preset-row">
-            <input type="text" id="preset-name" placeholder="Preset name" maxlength="40">
-            <button type="button" class="btn primary" id="btn-preset-save">Save</button>
+            <input type="text" id="preset-name" maxlength="40" data-i18n-attr-placeholder="preset.name">
+            <button type="button" class="btn primary" id="btn-preset-save" data-i18n="preset.save">Save</button>
           </div>
           <div class="preset-list" id="preset-list"></div>
         </section>
@@ -195,6 +197,6 @@
   </div>
 
   <div class="status-toast" id="toast" role="status"></div>
-  <script type="module" src="app.js?v=2"></script>
+  <script type="module" src="app.js?v=20"></script>
 </body>
 </html>

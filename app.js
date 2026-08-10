@@ -1,17 +1,23 @@
 import {
   PALETTES,
   PROJECTIONS,
-  DIM_LABELS,
-  NEST_DIM,
   DEFAULT_NEST_SCALE,
   defaultSettings,
   referencePreset,
   applyProjectionDefaults,
+  nestDimForProjection,
   resolvePalette,
   buildHypercubeSvg,
   paletteGroups,
   graphStats,
-} from "./hypercube.js";
+} from "./hypercube.js?v=20";
+import {
+  t,
+  applyI18n,
+  loadLocalePref,
+  setLocalePref,
+  getLocalePref,
+} from "./i18n.js?v=20";
 
 const PRESET_KEY = "hypercube-presets-v1";
 
@@ -27,6 +33,7 @@ const state = {
   hashTimer: 0,
   resizeTimer: 0,
   dimAnim: null, // animation frame id while morphing dimensions
+  labelMorph: null, // { fromN, toN, t } while dim-animating
   // Last settled geometry — used so interrupting a dim morph cannot zero lengths.
   committedN: 7,
   committedLengths: null,
@@ -47,8 +54,9 @@ const el = {
   presetName: document.getElementById("preset-name"),
   toast: document.getElementById("toast"),
   pngScale: document.getElementById("png-scale"),
-  projectionHint: document.getElementById("projection-hint"),
   mathProjectionNote: document.getElementById("math-projection-note"),
+  locale: document.getElementById("locale"),
+  vertexTip: document.getElementById("vertex-tip"),
 };
 
 function currentProjection() {
@@ -70,34 +78,14 @@ function updateProjectionUi() {
   document.querySelectorAll(".nest-layout-only").forEach((node) => {
     node.hidden = !usesNestLayout();
   });
-  if (el.projectionHint) {
-    if (proj === "szalkai") {
-      el.projectionHint.hidden = false;
-      el.projectionHint.textContent =
-        "Szalkai view: nested layout with a square user-facing face. Dim 4 puts a smaller rectangle in the same plane inside the larger outer one (same on the far side). Dims 1–2 stay equal.";
-    } else if (proj === "petrie") {
-      el.projectionHint.hidden = false;
-      el.projectionHint.textContent =
-        "Petrie view: Coxeter-plane projection — equal lengths give a regular 2n-gon outline. Nest scale applies only to Nested / Szalkai.";
-    } else {
-      el.projectionHint.hidden = true;
-      el.projectionHint.textContent = "";
-    }
-  }
   if (el.mathProjectionNote) {
-    if (proj === "szalkai") {
-      el.mathProjectionNote.innerHTML =
-        "This drawing is a <strong>Szalkai</strong> nested projection of <span class=\"math-sym\">Q<sub>n</sub></span> " +
-        "(square user-facing face; dim&nbsp;4 nests a smaller coplanar rectangle inside a larger outer one), not a literal view of <span class=\"math-sym\">n</span>-space.";
-    } else if (proj === "petrie") {
-      el.mathProjectionNote.innerHTML =
-        "This drawing is a <strong>Petrie projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
-        "(Coxeter plane; outer Petrie polygon is a regular <span class=\"math-sym\">2n</span>-gon), not a literal view of <span class=\"math-sym\">n</span>-space.";
-    } else {
-      el.mathProjectionNote.innerHTML =
-        "This drawing is a <strong>2D projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
-        "(nested / Schlegel for the 4th dimension), not a literal view of <span class=\"math-sym\">n</span>-space.";
-    }
+    const key =
+      proj === "szalkai"
+        ? "math.proj.szalkai"
+        : proj === "petrie"
+          ? "math.proj.petrie"
+          : "math.proj.nested";
+    el.mathProjectionNote.innerHTML = t(key);
   }
 }
 
@@ -121,7 +109,7 @@ function fillPaletteSelect() {
   const { dark, bright } = paletteGroups();
   el.palette.innerHTML = "";
   const gDark = document.createElement("optgroup");
-  gDark.label = "Dark";
+  gDark.label = t("palette.dark");
   for (const p of dark) {
     const o = document.createElement("option");
     o.value = p.id;
@@ -129,7 +117,7 @@ function fillPaletteSelect() {
     gDark.appendChild(o);
   }
   const gBright = document.createElement("optgroup");
-  gBright.label = "Bright";
+  gBright.label = t("palette.bright");
   for (const p of bright) {
     const o = document.createElement("option");
     o.value = p.id;
@@ -145,12 +133,12 @@ function updateSwatches() {
   el.swatches.innerHTML = "";
   const bg = document.createElement("i");
   bg.style.background = pal.background;
-  bg.title = "Background";
+  bg.title = t("style");
   el.swatches.appendChild(bg);
   for (let i = 0; i < state.settings.n; i++) {
     const chip = document.createElement("i");
     chip.style.background = pal.edges[i];
-    chip.title = DIM_LABELS[i];
+    chip.title = dimLabel(i);
     el.swatches.appendChild(chip);
   }
 }
@@ -176,8 +164,25 @@ function ensureEdgeColors() {
 }
 
 function dimLabel(i) {
-  if (!usesNestLayout()) return `Dim ${i + 1}`;
-  return DIM_LABELS[i];
+  if (currentProjection() === "szalkai") return t(`dim.szalkai.${i + 1}`);
+  if (usesNestLayout()) return t(`dim.nested.${i + 1}`);
+  return t("dim.short", { n: i + 1 });
+}
+
+function activeNestDim() {
+  return nestDimForProjection(currentProjection());
+}
+
+function refreshLocaleUi() {
+  applyI18n(document);
+  if (el.locale) el.locale.value = getLocalePref();
+  const keepPalette = el.palette.value;
+  fillPaletteSelect();
+  el.palette.value = keepPalette;
+  updateProjectionUi();
+  buildDimControls();
+  renderPresetList();
+  updateMathPanel();
 }
 
 function buildDimControls() {
@@ -187,7 +192,7 @@ function buildDimControls() {
   const szalkai = currentProjection() === "szalkai";
 
   for (let i = 0; i < n; i++) {
-    const isNest = usesNestLayout() && i === NEST_DIM;
+    const isNest = usesNestLayout() && i === activeNestDim();
 
     // Length / nest row
     const block = document.createElement("div");
@@ -200,7 +205,7 @@ function buildDimControls() {
     const vis = document.createElement("input");
     vis.type = "checkbox";
     vis.checked = state.settings.visible[i] !== false;
-    vis.title = "Show dimension";
+    vis.title = t("dim.show");
     vis.addEventListener("change", () => {
       state.settings.visible[i] = vis.checked;
       scheduleRedraw();
@@ -214,7 +219,7 @@ function buildDimControls() {
     const color = document.createElement("input");
     color.type = "color";
     color.value = toColorInput(edgeColor(i));
-    color.title = "Override color";
+    color.title = t("dim.color");
     color.addEventListener("input", () => {
       ensureEdgeColors();
       state.settings.edgeColors[i] = color.value;
@@ -227,7 +232,7 @@ function buildDimControls() {
     const label = document.createElement("label");
     const fullLabel = dimLabel(i);
     label.textContent = isNest ? fullLabel : fullLabel.replace(/ —.*$/, "");
-    label.htmlFor = isNest ? "nest-scale" : `len-${i}`;
+    label.htmlFor = isNest ? "nest-inline" : `len-${i}`;
 
     const num = document.createElement("input");
     num.type = "number";
@@ -242,119 +247,31 @@ function buildDimControls() {
       num.max = "0.85";
       num.step = "0.01";
       num.value = state.settings.nestScale.toFixed(2);
-      num.setAttribute("aria-label", "Nest scale value");
-      num.addEventListener("change", () => {
-        const nestRange = document.getElementById("nest-scale");
-        const nestNum = document.getElementById("nest-scale-num");
-        let v = clamp(Number(num.value), 0.15, 0.85);
+      num.setAttribute("aria-label", t("dim.nestScale"));
+      const range = document.createElement("input");
+      range.type = "range";
+      range.id = "nest-inline";
+      range.min = "0.15";
+      range.max = "0.85";
+      range.step = "0.01";
+      range.value = String(state.settings.nestScale);
+      range.setAttribute(
+        "aria-label",
+        t("dim.nestScaleAria", { n: i + 1 }),
+      );
+      const syncNest = (raw) => {
+        let v = clamp(Number(raw), 0.15, 0.85);
         v = Math.round(v * 100) / 100;
         state.settings.nestScale = v;
         num.value = v.toFixed(2);
-        if (nestRange) nestRange.value = String(v);
-        if (nestNum) nestNum.value = v.toFixed(2);
-        commitGeometry();
-        scheduleRedraw();
-        scheduleHash();
-      });
-      const note = document.createElement("div");
-      note.style.cssText = "font-size:11px;color:var(--muted);margin-top:2px";
-      note.textContent = "Same as Nest scale above";
-      block.appendChild(note);
-    } else if (i === 2 && usesNestLayout() && n > NEST_DIM) {
-      // Two depth sliders: outer 3D cube vs nested (4th-dim) cube.
-      label.textContent = "Dim 3 — outer";
-      label.htmlFor = "len-2";
-      const min = 0;
-      const max = 200;
-      if (state.settings.innerDepth == null) {
-        state.settings.innerDepth =
-          state.settings.lengths[2] * state.settings.nestScale;
-      }
-      const range = document.createElement("input");
-      range.type = "range";
-      range.id = "len-2";
-      range.min = String(min);
-      range.max = String(max);
-      range.step = "1";
-      range.value = String(state.settings.lengths[2]);
-      num.id = "len-2-num";
-      num.min = String(min);
-      num.max = String(max);
-      num.step = "1";
-      num.value = String(Math.round(state.settings.lengths[2]));
-      num.setAttribute("aria-label", "Dim 3 outer depth length");
-      const syncOuter = (raw) => {
-        const v = Math.round(clamp(Number(raw), min, max));
-        state.settings.lengths[2] = v;
         range.value = String(v);
-        num.value = String(v);
         commitGeometry();
         scheduleRedraw();
         scheduleHash();
       };
-      range.addEventListener("input", () => syncOuter(range.value));
-      num.addEventListener("change", () => syncOuter(num.value));
+      range.addEventListener("input", () => syncNest(range.value));
+      num.addEventListener("change", () => syncNest(num.value));
       block.appendChild(range);
-
-      const innerBlock = document.createElement("div");
-      innerBlock.className = "slider-block dim-row";
-      innerBlock.dataset.dim = "2-inner";
-      const innerHead = document.createElement("div");
-      innerHead.className = "slider-head";
-      const innerChip = document.createElement("span");
-      innerChip.className = "chip";
-      innerChip.style.background = edgeColor(2);
-      const innerLabel = document.createElement("label");
-      innerLabel.textContent = "Dim 3 — nested (dim 4)";
-      innerLabel.htmlFor = "len-2-inner";
-      const innerNum = document.createElement("input");
-      innerNum.type = "number";
-      innerNum.className = "num";
-      innerNum.id = "len-2-inner-num";
-      innerNum.min = String(min);
-      innerNum.max = String(max);
-      innerNum.step = "1";
-      innerNum.value = String(Math.round(state.settings.innerDepth));
-      innerNum.setAttribute("aria-label", "Dim 3 nested cuboid depth length");
-      innerHead.append(innerChip, innerLabel, innerNum);
-      const innerRange = document.createElement("input");
-      innerRange.type = "range";
-      innerRange.id = "len-2-inner";
-      innerRange.min = String(min);
-      innerRange.max = String(max);
-      innerRange.step = "1";
-      innerRange.value = String(Math.round(state.settings.innerDepth));
-      const syncInner = (raw) => {
-        const v = Math.round(clamp(Number(raw), min, max));
-        state.settings.innerDepth = v;
-        innerRange.value = String(v);
-        innerNum.value = String(v);
-        commitGeometry();
-        scheduleRedraw();
-        scheduleHash();
-      };
-      innerRange.addEventListener("input", () => syncInner(innerRange.value));
-      innerNum.addEventListener("change", () => syncInner(innerNum.value));
-      innerBlock.append(innerHead, innerRange);
-
-      const bindDepthHover = (node) => {
-        node.addEventListener("pointerenter", () => {
-          state.highlightDim = 2;
-          block.classList.add("highlight-active");
-          innerBlock.classList.add("highlight-active");
-          scheduleRedraw();
-        });
-        node.addEventListener("pointerleave", () => {
-          state.highlightDim = null;
-          block.classList.remove("highlight-active");
-          innerBlock.classList.remove("highlight-active");
-          scheduleRedraw();
-        });
-      };
-      bindDepthHover(block);
-      bindDepthHover(innerBlock);
-      el.lengthSliders.appendChild(block);
-      el.lengthSliders.appendChild(innerBlock);
     } else {
       const min = i < 3 ? 10 : 40;
       const max = i < 3 ? 200 : 800;
@@ -370,7 +287,7 @@ function buildDimControls() {
       num.max = String(max);
       num.step = "1";
       num.value = String(Math.round(state.settings.lengths[i]));
-      num.setAttribute("aria-label", `${fullLabel} length`);
+      num.setAttribute("aria-label", t("dim.lengthAria", { label: fullLabel }));
       const syncLen = (raw) => {
         const v = Math.round(clamp(Number(raw), min, max));
         state.settings.lengths[i] = v;
@@ -397,7 +314,6 @@ function buildDimControls() {
       block.appendChild(range);
     }
 
-    const dualDepth = i === 2 && usesNestLayout() && n > NEST_DIM;
     const bindHover = (node) => {
       node.addEventListener("pointerenter", () => {
         state.highlightDim = i;
@@ -410,10 +326,8 @@ function buildDimControls() {
         scheduleRedraw();
       });
     };
-    if (!dualDepth) {
-      bindHover(block);
-      el.lengthSliders.appendChild(block);
-    }
+    bindHover(block);
+    el.lengthSliders.appendChild(block);
 
     // Angle
     const ablock = document.createElement("div");
@@ -422,7 +336,7 @@ function buildDimControls() {
     const ahead = document.createElement("div");
     ahead.className = "slider-head";
     const alabel = document.createElement("label");
-    alabel.textContent = `Angle ${i + 1}°`;
+    alabel.textContent = t("dim.angle", { n: i + 1 });
     alabel.htmlFor = `ang-${i}`;
     const anum = document.createElement("input");
     anum.type = "number";
@@ -432,10 +346,7 @@ function buildDimControls() {
     anum.max = "179.5";
     anum.step = "0.5";
     anum.value = state.settings.angles[i].toFixed(1);
-    // Nest dim has no free angle (Nested view only).
-    const angLocked = isNest;
-    anum.disabled = angLocked;
-    anum.setAttribute("aria-label", `Angle ${i + 1}`);
+    anum.setAttribute("aria-label", t("dim.angleAria", { n: i + 1 }));
     ahead.append(alabel, anum);
     const arange = document.createElement("input");
     arange.type = "range";
@@ -444,7 +355,6 @@ function buildDimControls() {
     arange.max = "179.5";
     arange.step = "0.5";
     arange.value = String(state.settings.angles[i]);
-    arange.disabled = angLocked;
     const syncAng = (raw) => {
       const v = Math.round(clamp(Number(raw), 0, 179.5) * 2) / 2;
       state.settings.angles[i] = v;
@@ -489,7 +399,6 @@ function syncFormFromSettings() {
   el.palette.value = s.palette;
   el.pngScale.value = String(s.pngScale);
   setPair("n", "n-num", s.n, (v) => String(v));
-  setPair("nest-scale", "nest-scale-num", s.nestScale, (v) => v.toFixed(2));
   setPair("stretch-x", "stretch-x-num", s.stretchX, (v) => v.toFixed(2));
   document.getElementById("show-vertices").checked = s.showVertices;
   document.getElementById("show-labels").checked = !!s.showLabels;
@@ -530,11 +439,13 @@ function scheduleRedraw() {
 function redraw() {
   const { svg, background } = buildHypercubeSvg(state.settings, {
     highlightDim: state.highlightDim,
+    labelMorph: state.settings.showLabels ? state.labelMorph : null,
   });
   el.stageInner.replaceChildren(svg);
   el.stageWrap.style.background = background;
   applyViewTransform();
   updateMathPanel();
+  hideVertexTip();
 }
 
 function applyViewTransform() {
@@ -603,6 +514,7 @@ function cancelDimAnim() {
     cancelAnimationFrame(state.dimAnim);
     state.dimAnim = null;
   }
+  state.labelMorph = null;
   delete state.settings.petrieAngleN;
   el.stageInner.classList.remove("dim-animating");
 }
@@ -634,38 +546,75 @@ function animateDimensionChange(newN) {
   }
 
   el.stageInner.classList.add("dim-animating");
+  state.labelMorph = state.settings.showLabels
+    ? { fromN: oldN, toN: newN, t: 0 }
+    : null;
 
   const petrie = currentProjection() === "petrie";
+  const szalkai = currentProjection() === "szalkai";
   // Petrie must also rotate basis angles (π·i/n); give that sweep a bit more time.
   const duration = (petrie ? 620 : 480) + Math.abs(newN - oldN) * (petrie ? 110 : 80);
   const targetLengths = state.committedLengths.slice();
   const targetNest = state.committedNest;
   const maxN = Math.max(oldN, newN, 1); // render at least Q1 shell while morphing to/from Q0
   const nestAware = usesNestLayout();
+  const nestDim = activeNestDim();
   const startAngleN = Math.max(oldN, 1);
   const endAngleN = Math.max(newN, 1);
 
   // Snapshot start geometry (render at maxN so edges can appear/disappear).
-  // Nested view keeps nest-dim length fixed and morphs nestScale instead.
+  // Nest layouts keep nest-dim length fixed and morph nestScale instead.
   const startLengths = targetLengths.map((len, i) => {
-    if (newN > oldN && i >= oldN && !(nestAware && i === NEST_DIM)) return 0;
-    if (newN < oldN && i >= newN && !(nestAware && i === NEST_DIM)) return len;
+    if (newN > oldN && i >= oldN && !(nestAware && i === nestDim)) return 0;
+    if (newN < oldN && i >= newN && !(nestAware && i === nestDim)) return len;
     return len;
   });
   const endLengths = targetLengths.map((len, i) => {
-    if (newN < oldN && i >= newN && !(nestAware && i === NEST_DIM)) return 0;
-    if (newN > oldN && i >= oldN && !(nestAware && i === NEST_DIM)) return len;
+    if (newN < oldN && i >= newN && !(nestAware && i === nestDim)) return 0;
+    if (newN > oldN && i >= oldN && !(nestAware && i === nestDim)) return len;
     return len;
   });
 
   let startNest = targetNest;
   let endNest = targetNest;
-  if (nestAware && oldN <= NEST_DIM && newN > NEST_DIM) {
-    startNest = 1; // outer = inner, then nest opens
-    endNest = targetNest;
-  } else if (nestAware && oldN > NEST_DIM && newN <= NEST_DIM) {
-    startNest = targetNest;
-    endNest = 1; // collapse nest before dropping the dimension
+  /** @type {{ base: number[], scaleStart: number, scaleEnd: number, nestNum: number } | null} */
+  let nestMorph = null;
+
+  if (nestAware && oldN <= nestDim && newN > nestDim) {
+    if (szalkai) {
+      // Szalkai H₃: grow inward (outer fixed, inner shrinks from full size).
+      startNest = 1;
+      endNest = targetNest;
+    } else {
+      // Nested view: grow a larger outer cuboid around the existing one.
+      const nestBound = Math.max(targetNest, 0.05);
+      const base = [0, 1, 2].map((i) => targetLengths[i]);
+      nestMorph = { base, scaleStart: 1, scaleEnd: 1 / nestBound, nestNum: 1 };
+      startNest = 1;
+      endNest = targetNest;
+      for (const i of [0, 1, 2]) {
+        startLengths[i] = base[i];
+        endLengths[i] = base[i] * nestMorph.scaleEnd;
+        targetLengths[i] = endLengths[i];
+      }
+    }
+  } else if (nestAware && oldN > nestDim && newN <= nestDim) {
+    if (szalkai) {
+      // Szalkai: expand inner back to outer, then drop nest dim.
+      startNest = targetNest;
+      endNest = 1;
+    } else {
+      const nestBound = Math.max(targetNest, 0.05);
+      const base = [0, 1, 2].map((i) => targetLengths[i]);
+      nestMorph = { base, scaleStart: 1, scaleEnd: nestBound, nestNum: nestBound };
+      startNest = targetNest;
+      endNest = 1;
+      for (const i of [0, 1, 2]) {
+        startLengths[i] = base[i];
+        endLengths[i] = base[i] * nestMorph.scaleEnd;
+        targetLengths[i] = endLengths[i];
+      }
+    }
   }
 
   state.settings.n = maxN;
@@ -688,7 +637,15 @@ function animateDimensionChange(newN) {
     for (let i = 0; i < 7; i++) {
       state.settings.lengths[i] = lerp(startLengths[i], endLengths[i], e);
     }
-    state.settings.nestScale = lerp(startNest, endNest, e);
+    if (nestMorph) {
+      const outerScale = lerp(nestMorph.scaleStart, nestMorph.scaleEnd, e);
+      for (const i of [0, 1, 2]) {
+        state.settings.lengths[i] = nestMorph.base[i] * outerScale;
+      }
+      state.settings.nestScale = nestMorph.nestNum / Math.max(outerScale, 1e-6);
+    } else {
+      state.settings.nestScale = lerp(startNest, endNest, e);
+    }
     // Keep a drawable n during the morph; Q0 (a single point) settles at the end.
     state.settings.n = Math.max(oldN, newN, 1);
     if (petrie) {
@@ -697,6 +654,7 @@ function animateDimensionChange(newN) {
     }
 
     state.highlightDim = null;
+    if (state.labelMorph) state.labelMorph.t = e;
     redraw();
 
     const svg = el.stageInner.querySelector("svg");
@@ -704,7 +662,12 @@ function animateDimensionChange(newN) {
       svg.querySelectorAll("g[data-dimension]").forEach((g) => {
         const dim = Number(g.getAttribute("data-dimension")); // 1-based
         const i = dim - 1;
-        if (newN > oldN && i >= oldN && i < newN) {
+        // Nest-scale collapse already shrinks nest-dim edges to zero — don't fade them.
+        const collapsingNest =
+          nestAware && oldN > nestDim && newN <= nestDim && i === nestDim;
+        if (collapsingNest) {
+          g.style.opacity = "";
+        } else if (newN > oldN && i >= oldN && i < newN) {
           g.style.opacity = String(0.15 + 0.85 * e);
         } else if (newN < oldN && i >= newN && i < oldN) {
           g.style.opacity = String(1 - 0.85 * e);
@@ -741,9 +704,14 @@ function animateDimensionChange(newN) {
     state.settings.n = newN;
     state.settings.lengths = targetLengths.slice();
     state.settings.nestScale = targetNest;
+    // Szalkai: restore square face after a dim-2 grow/shrink morph.
+    if (currentProjection() === "szalkai" && newN >= 2) {
+      const side = state.settings.lengths[0];
+      state.settings.lengths[1] = side;
+      targetLengths[1] = side;
+    }
     delete state.settings.petrieAngleN;
     commitGeometry();
-    setPair("nest-scale", "nest-scale-num", targetNest, (v) => v.toFixed(2));
     setPair("n", "n-num", newN, (v) => String(v));
     cancelDimAnim();
     buildDimControls();
@@ -774,6 +742,35 @@ function pointerMidpoint(a, b) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
+function hideVertexTip() {
+  if (!el.vertexTip) return;
+  el.vertexTip.hidden = true;
+  el.stage.classList.remove("hover-vertex");
+}
+
+function showVertexTip(clientX, clientY, label) {
+  if (!el.vertexTip) return;
+  const wrap = el.stageWrap.getBoundingClientRect();
+  el.vertexTip.hidden = false;
+  el.vertexTip.textContent = label;
+  el.vertexTip.style.left = `${clientX - wrap.left}px`;
+  el.vertexTip.style.top = `${clientY - wrap.top}px`;
+  el.stage.classList.add("hover-vertex");
+}
+
+function hitVertexAt(clientX, clientY) {
+  const stack = document.elementsFromPoint(clientX, clientY);
+  for (const node of stack) {
+    if (node instanceof Element && node.hasAttribute("data-vertex")) {
+      return {
+        v: Number(node.getAttribute("data-vertex")),
+        label: node.getAttribute("data-label") || "",
+      };
+    }
+  }
+  return null;
+}
+
 /* —— Zoom / pan (mouse wheel, drag, pinch) —— */
 function setupStageInteractions() {
   el.stage.addEventListener(
@@ -789,8 +786,23 @@ function setupStageInteractions() {
     { passive: false },
   );
 
+  el.stage.addEventListener("pointermove", (e) => {
+    if (state.pointers.size > 0 || state.panning) {
+      hideVertexTip();
+      return;
+    }
+    const hit = hitVertexAt(e.clientX, e.clientY);
+    if (hit) showVertexTip(e.clientX, e.clientY, hit.label);
+    else hideVertexTip();
+  });
+
+  el.stage.addEventListener("pointerleave", () => {
+    if (state.pointers.size === 0) hideVertexTip();
+  });
+
   el.stage.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
+    hideVertexTip();
     state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try {
       el.stage.setPointerCapture(e.pointerId);
@@ -952,7 +964,12 @@ function setupControls() {
     redraw();
     fitView();
     scheduleHash();
-    toast(`${PROJECTIONS[currentProjection()].short}`);
+    toast(t(`proj.${currentProjection()}.short`));
+  });
+
+  el.locale?.addEventListener("change", () => {
+    setLocalePref(el.locale.value);
+    refreshLocaleUi();
   });
 
   el.palette.addEventListener("change", () => {
@@ -981,11 +998,6 @@ function setupControls() {
       state.settings[key] = v;
       range.value = String(v);
       num.value = fmt(v);
-      if (key === "nestScale") {
-        const inline = document.getElementById("nest-inline-num");
-        if (inline) inline.value = fmt(v);
-        commitGeometry();
-      }
       scheduleRedraw();
       scheduleHash();
       if (fromNum) num.blur();
@@ -1008,9 +1020,6 @@ function setupControls() {
     if (e.key === "Enter") applyN(e.target.value);
   });
 
-  bindRangeNumber("nest-scale", "nest-scale-num", "nestScale", {
-    min: 0.15, max: 0.85, step: 0.01, fmt: (v) => v.toFixed(2),
-  });
   bindRangeNumber("stretch-x", "stretch-x-num", "stretchX", {
     min: 0.6, max: 2.5, step: 0.01, fmt: (v) => v.toFixed(2),
   });
@@ -1032,6 +1041,7 @@ function setupControls() {
 
   document.getElementById("show-labels").addEventListener("change", (e) => {
     state.settings.showLabels = e.target.checked;
+    if (!e.target.checked) state.labelMorph = null;
     scheduleRedraw();
     scheduleHash();
   });
@@ -1044,7 +1054,7 @@ function setupControls() {
     redraw();
     fitView();
     scheduleHash();
-    toast("Reset to defaults");
+    toast(t("toast.reset"));
   });
 
   document.getElementById("btn-preset-ref").addEventListener("click", () => {
@@ -1055,7 +1065,7 @@ function setupControls() {
     redraw();
     fitView();
     scheduleHash();
-    toast("Loaded reference-like preset");
+    toast(t("toast.reference"));
   });
 
   document.getElementById("btn-preset-save").addEventListener("click", savePreset);
@@ -1083,7 +1093,7 @@ function renderPresetList() {
   if (!list.length) {
     const empty = document.createElement("div");
     empty.style.cssText = "font-size:12px;color:var(--muted)";
-    empty.textContent = "No saved presets yet.";
+    empty.textContent = t("preset.empty");
     el.presetList.appendChild(empty);
     return;
   }
@@ -1095,7 +1105,7 @@ function renderPresetList() {
     const loadBtn = document.createElement("button");
     loadBtn.type = "button";
     loadBtn.className = "btn";
-    loadBtn.textContent = "Load";
+    loadBtn.textContent = t("preset.load");
     loadBtn.addEventListener("click", () => {
       cancelDimAnim();
       state.settings = { ...defaultSettings(), ...item.settings };
@@ -1111,16 +1121,16 @@ function renderPresetList() {
       scheduleRedraw();
       scheduleHash();
       requestAnimationFrame(fitView);
-      toast(`Loaded “${item.name}”`);
+      toast(t("toast.loaded", { name: item.name }));
     });
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.className = "btn";
-    delBtn.textContent = "Delete";
+    delBtn.textContent = t("preset.delete");
     delBtn.addEventListener("click", () => {
       writePresetStore(list.filter((p) => p.name !== item.name));
       renderPresetList();
-      toast("Preset deleted");
+      toast(t("toast.deleted"));
     });
     row.append(name, loadBtn, delBtn);
     el.presetList.appendChild(row);
@@ -1130,7 +1140,7 @@ function renderPresetList() {
 function savePreset() {
   const name = (el.presetName.value || "").trim();
   if (!name) {
-    toast("Enter a preset name");
+    toast(t("toast.presetName"));
     return;
   }
   const list = loadPresetStore().filter((p) => p.name !== name);
@@ -1142,7 +1152,7 @@ function savePreset() {
   writePresetStore(list.slice(0, 30));
   el.presetName.value = "";
   renderPresetList();
-  toast(`Saved “${name}”`);
+  toast(t("toast.saved", { name }));
 }
 
 /* —— URL hash —— */
@@ -1153,7 +1163,6 @@ function serializeSettings() {
     pr: currentProjection(),
     n: s.n,
     ns: s.nestScale,
-    id: s.innerDepth,
     sx: s.stretchX,
     sw: s.strokeWidth,
     vr: s.vertexRadius,
@@ -1185,9 +1194,6 @@ function applySerialized(data) {
   if (Array.isArray(data.V) && data.V.length === 7) s.visible = data.V.map(Boolean);
   if (Array.isArray(data.C) && data.C.length >= s.n) s.edgeColors = data.C;
   if (data.ps) s.pngScale = Number(data.ps);
-  // Inner depth: explicit value, else keep classic nestScale × outer depth.
-  if (data.id != null) s.innerDepth = Number(data.id);
-  else s.innerDepth = s.lengths[2] * s.nestScale;
   state.settings = s;
 }
 
@@ -1222,9 +1228,9 @@ async function copyShareLink() {
   await new Promise((r) => setTimeout(r, 280));
   try {
     await navigator.clipboard.writeText(location.href);
-    toast("Link copied");
+    toast(t("toast.linkCopied"));
   } catch {
-    toast("Copy failed — URL is in the address bar");
+    toast(t("toast.linkFailed"));
   }
 }
 
@@ -1245,7 +1251,7 @@ function exportSvg() {
   const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
   const name = `hypercube-q${state.settings.n}-${state.settings.palette}.svg`;
   downloadBlob(blob, name);
-  toast("SVG exported");
+  toast(t("toast.svg"));
 }
 
 function exportPng() {
@@ -1268,21 +1274,21 @@ function exportPng() {
     canvas.toBlob(
       (png) => {
         if (!png) {
-          toast("PNG export failed");
+          toast(t("toast.pngFail"));
           return;
         }
         downloadBlob(
           png,
           `hypercube-q${state.settings.n}-${state.settings.palette}-${scale}x.png`,
         );
-        toast(`PNG exported (${scale}×)`);
+        toast(t("toast.png", { scale }));
       },
       "image/png",
     );
   };
   img.onerror = () => {
     URL.revokeObjectURL(url);
-    toast("PNG export failed");
+    toast(t("toast.pngFail"));
   };
   img.src = url;
 }
@@ -1308,6 +1314,9 @@ function setupKeyboard() {
 
 /* —— Init —— */
 function init() {
+  loadLocalePref();
+  applyI18n(document);
+  if (el.locale) el.locale.value = getLocalePref();
   fillPaletteSelect();
   const fromHash = loadFromHash();
   if (!fromHash) state.settings = defaultSettings();
