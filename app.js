@@ -57,8 +57,7 @@ function currentProjection() {
 }
 
 function usesNestLayout() {
-  const p = currentProjection();
-  return p === "nested" || p === "szalkai";
+  return currentProjection() === "nested";
 }
 
 function updateProjectionUi() {
@@ -74,11 +73,11 @@ function updateProjectionUi() {
     if (proj === "szalkai") {
       el.projectionHint.hidden = false;
       el.projectionHint.textContent =
-        "Szalkai view: same nested layout, with a perfect square face (dims 1–2 equal length, 90°). Changing either side length keeps them equal.";
+        "Szalkai view: parallel copy-and-offset layout with square-faced unit cubes packed into a rectangle (after Dr. István Szalkai). Dims 1–2 stay equal.";
     } else if (proj === "petrie") {
       el.projectionHint.hidden = false;
       el.projectionHint.textContent =
-        "Petrie view: Coxeter-plane projection — equal lengths give a regular 2n-gon outline. Nest scale applies only to Nested / Szalkai.";
+        "Petrie view: Coxeter-plane projection — equal lengths give a regular 2n-gon outline. Nest scale applies only to Nested.";
     } else {
       el.projectionHint.hidden = true;
       el.projectionHint.textContent = "";
@@ -87,8 +86,8 @@ function updateProjectionUi() {
   if (el.mathProjectionNote) {
     if (proj === "szalkai") {
       el.mathProjectionNote.innerHTML =
-        "This drawing is a <strong>Szalkai</strong> nested projection of <span class=\"math-sym\">Q<sub>n</sub></span> " +
-        "(square face: equal orthogonal sides), not a literal view of <span class=\"math-sym\">n</span>-space.";
+        "This drawing is a <strong>Szalkai rectangle</strong> layout of <span class=\"math-sym\">Q<sub>n</sub></span> " +
+        "(parallel shelves of square-faced cubes), not a literal view of <span class=\"math-sym\">n</span>-space.";
     } else if (proj === "petrie") {
       el.mathProjectionNote.innerHTML =
         "This drawing is a <strong>Petrie projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
@@ -335,8 +334,8 @@ function buildDimControls() {
     anum.max = "179.5";
     anum.step = "0.5";
     anum.value = state.settings.angles[i].toFixed(1);
-    // Nest dim has no free angle; Szalkai locks the square face (dims 1–2).
-    const angLocked = isNest || (szalkai && (i === 0 || i === 1));
+    // Nest dim has no free angle (Nested view only).
+    const angLocked = isNest;
     anum.disabled = angLocked;
     anum.setAttribute("aria-label", `Angle ${i + 1}`);
     ahead.append(alabel, anum);
