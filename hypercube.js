@@ -336,15 +336,16 @@ export function linearPositions(basis) {
 }
 
 /**
- * Petrie / Coxeter-plane projection: basis vectors at angles k·π/n so the
- * Petrie polygon is a regular 2n-gon and all edges share equal length when
- * lengths[i] match.
+ * Petrie / Coxeter-plane projection: basis vectors at angles k·π/angleN so the
+ * Petrie polygon is a regular 2n-gon when angleN === n. During dimension morphs,
+ * angleN may be a fractional blend between old and new n so axes rotate smoothly.
  */
-export function petrieBasisVectors(lengths, n) {
+export function petrieBasisVectors(lengths, n, angleN = n) {
+  const denom = Math.max(Number(angleN) || n || 1, 1e-6);
   const basis = [];
   for (let i = 0; i < n; i++) {
     const len = Number.isFinite(lengths[i]) ? Math.max(0, lengths[i]) : PETRIE_EDGE;
-    const a = (Math.PI * i) / n;
+    const a = (Math.PI * i) / denom;
     basis.push([Math.cos(a) * len, Math.sin(a) * len]);
   }
   return basis;
@@ -390,7 +391,9 @@ export function positionsForSettings(settings, n) {
   if (n <= 0) return [[0, 0]];
   const proj = PROJECTIONS[settings.projection] ? settings.projection : "nested";
   if (proj === "petrie") {
-    return linearPositions(petrieBasisVectors(settings.lengths, n));
+    const angleN =
+      settings.petrieAngleN != null ? settings.petrieAngleN : n;
+    return linearPositions(petrieBasisVectors(settings.lengths, n, angleN));
   }
   // Nested + Szalkai share the nest/Schlegel layout; Szalkai locks a square face.
   let angles = settings.angles;

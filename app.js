@@ -498,6 +498,7 @@ function restoreCommittedGeometry() {
   state.settings.n = state.committedN;
   state.settings.lengths = state.committedLengths.slice();
   state.settings.nestScale = state.committedNest;
+  delete state.settings.petrieAngleN;
 }
 
 function cancelDimAnim() {
@@ -505,6 +506,7 @@ function cancelDimAnim() {
     cancelAnimationFrame(state.dimAnim);
     state.dimAnim = null;
   }
+  delete state.settings.petrieAngleN;
   el.stageInner.classList.remove("dim-animating");
 }
 
@@ -536,11 +538,15 @@ function animateDimensionChange(newN) {
 
   el.stageInner.classList.add("dim-animating");
 
-  const duration = 480 + Math.abs(newN - oldN) * 80;
+  const petrie = currentProjection() === "petrie";
+  // Petrie must also rotate basis angles (π·i/n); give that sweep a bit more time.
+  const duration = (petrie ? 620 : 480) + Math.abs(newN - oldN) * (petrie ? 110 : 80);
   const targetLengths = state.committedLengths.slice();
   const targetNest = state.committedNest;
   const maxN = Math.max(oldN, newN, 1); // render at least Q1 shell while morphing to/from Q0
   const nestAware = usesNestLayout();
+  const startAngleN = Math.max(oldN, 1);
+  const endAngleN = Math.max(newN, 1);
 
   // Snapshot start geometry (render at maxN so edges can appear/disappear).
   // Nested view keeps nest-dim length fixed and morphs nestScale instead.
@@ -568,6 +574,8 @@ function animateDimensionChange(newN) {
   state.settings.n = maxN;
   state.settings.lengths = startLengths.slice();
   state.settings.nestScale = startNest;
+  if (petrie) state.settings.petrieAngleN = startAngleN;
+  else delete state.settings.petrieAngleN;
   el.brandN.textContent = `Q${subscript(newN)}`;
   setPair("n", "n-num", newN, (v) => String(v));
   buildDimControls();
@@ -586,6 +594,10 @@ function animateDimensionChange(newN) {
     state.settings.nestScale = lerp(startNest, endNest, e);
     // Keep a drawable n during the morph; Q0 (a single point) settles at the end.
     state.settings.n = Math.max(oldN, newN, 1);
+    if (petrie) {
+      // Blend Coxeter-plane spacing so existing axes rotate instead of jumping.
+      state.settings.petrieAngleN = lerp(startAngleN, endAngleN, e);
+    }
 
     state.highlightDim = null;
     redraw();
@@ -632,6 +644,7 @@ function animateDimensionChange(newN) {
     state.settings.n = newN;
     state.settings.lengths = targetLengths.slice();
     state.settings.nestScale = targetNest;
+    delete state.settings.petrieAngleN;
     commitGeometry();
     setPair("nest-scale", "nest-scale-num", targetNest, (v) => v.toFixed(2));
     setPair("n", "n-num", newN, (v) => String(v));
