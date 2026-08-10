@@ -13,7 +13,7 @@ Then visit [http://127.0.0.1:8731/](http://127.0.0.1:8731/).
 
 ## Features
 
-- View modes: **Nested** (Schlegel), **Szalkai** (rectangular shelf layout), **Petrie** (Coxeter-plane / regular \(2n\)-gon)
+- View modes: **Nested** (Schlegel), **Szalkai** (nested with a square face), **Petrie** (Coxeter-plane / regular \(2n\)-gon)
 - Math panel: definition of \(Q_n\), live vertex/edge/degree counts, binary labels
 - Dark & bright palettes, per-dimension lengths / colors (angles in Nested)
 - Live zoom, pan, fit

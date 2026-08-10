@@ -16,7 +16,7 @@ export const PROJECTIONS = {
   szalkai: {
     id: "szalkai",
     label: "Szalkai",
-    short: "Szalkai rectangle",
+    short: "Szalkai square face",
   },
   petrie: {
     id: "petrie",
@@ -36,8 +36,19 @@ export const DEFAULT_BASIS_POLAR = [
   [108.0, 470.0],
 ];
 
-/** Length defaults tuned for Szalkai’s axis-aligned shelf layout. */
-export const SZALKAI_LENGTHS = [56, 48, 38, 100, 100, 160, 160];
+/**
+ * Szalkai = nested layout with a perfect square face:
+ * dims 0–1 equal length and orthogonal (0° / 90°).
+ */
+export const SZALKAI_BASIS_POLAR = [
+  [0.0, 64.0],
+  [90.0, 64.0],
+  [135.0, 52.0],
+  [0.0, 1.0],
+  [6.0, 300.0],
+  [78.0, 230.0],
+  [108.0, 470.0],
+];
 
 /** Equal edge length for a true Petrie (Coxeter-plane) projection. */
 export const PETRIE_EDGE = 48;
@@ -225,15 +236,31 @@ export function applyProjectionDefaults(settings, projection) {
   const s = settings;
   s.projection = PROJECTIONS[projection] ? projection : "nested";
   if (s.projection === "szalkai") {
-    s.lengths = SZALKAI_LENGTHS.slice();
+    s.lengths = SZALKAI_BASIS_POLAR.map(([, len]) => len);
+    s.angles = SZALKAI_BASIS_POLAR.map(([deg]) => deg);
+    s.stretchX = 1;
+    s.nestScale = DEFAULT_NEST_SCALE;
   } else if (s.projection === "petrie") {
     s.lengths = Array(7).fill(PETRIE_EDGE);
   } else {
     s.lengths = DEFAULT_BASIS_POLAR.map(([, len]) => len);
     s.angles = DEFAULT_BASIS_POLAR.map(([deg]) => deg);
     s.nestScale = DEFAULT_NEST_SCALE;
+    s.stretchX = 1.45;
   }
   return s;
+}
+
+/** Enforce Szalkai’s square face on a copy of lengths/angles. */
+export function szalkaiFaceSettings(settings) {
+  const lengths = settings.lengths.slice();
+  const angles = settings.angles.slice();
+  const side = Number.isFinite(lengths[0]) ? Math.max(0, lengths[0]) : 64;
+  lengths[0] = side;
+  lengths[1] = side;
+  angles[0] = 0;
+  angles[1] = 90;
+  return { lengths, angles, stretchX: 1 };
 }
 
 /** Relative luminance of a #rrggbb (or #rgb) color; used for label contrast. */
@@ -309,52 +336,6 @@ export function linearPositions(basis) {
 }
 
 /**
- * Szalkai-style shelf layout (after Dr. István Szalkai’s cube-graph drawings):
- * dims 0–1 axis-aligned rectangle, dim 2 short oblique depth, dims 3+ alternate
- * horizontal / vertical offsets sized from the lower-dim bounding box so copies
- * pack into a clean rectangle of cubes.
- */
-export function szalkaiBasisVectors(lengths, n) {
-  const basis = [];
-  const len = (i, fallback) => {
-    const v = lengths[i];
-    return Number.isFinite(v) ? Math.max(0, v) : fallback;
-  };
-
-  if (n >= 1) basis.push([len(0, 56), 0]);
-  if (n >= 2) basis.push([0, len(1, 48)]);
-  if (n >= 3) {
-    const d = len(2, 38);
-    basis.push([d * 0.72, d * 0.52]);
-  }
-
-  for (let i = 3; i < n; i++) {
-    let xPos = 0;
-    let xNeg = 0;
-    let yPos = 0;
-    let yNeg = 0;
-    for (let j = 0; j < i; j++) {
-      const [x, y] = basis[j];
-      if (x > 0) xPos += x;
-      else xNeg += x;
-      if (y > 0) yPos += y;
-      else yNeg += y;
-    }
-    const w = xPos - xNeg;
-    const h = yPos - yNeg;
-    const ref = SZALKAI_LENGTHS[i] || 100;
-    const gapFactor = len(i, ref) / ref;
-    const pad = 22;
-    if ((i - 3) % 2 === 0) {
-      basis.push([(w + pad) * gapFactor, 0]);
-    } else {
-      basis.push([0, (h + pad) * gapFactor]);
-    }
-  }
-  return basis;
-}
-
-/**
  * Petrie / Coxeter-plane projection: basis vectors at angles k·π/n so the
  * Petrie polygon is a regular 2n-gon and all edges share equal length when
  * lengths[i] match.
@@ -408,18 +389,17 @@ export function projectedPositions(basis, nestDim = NEST_DIM, nestScale = DEFAUL
 export function positionsForSettings(settings, n) {
   if (n <= 0) return [[0, 0]];
   const proj = PROJECTIONS[settings.projection] ? settings.projection : "nested";
-  if (proj === "szalkai") {
-    return linearPositions(szalkaiBasisVectors(settings.lengths, n));
-  }
   if (proj === "petrie") {
     return linearPositions(petrieBasisVectors(settings.lengths, n));
   }
-  const basis = basisVectors(
-    settings.angles,
-    settings.lengths,
-    n,
-    settings.stretchX,
-  );
+  // Nested + Szalkai share the nest/Schlegel layout; Szalkai locks a square face.
+  let angles = settings.angles;
+  let lengths = settings.lengths;
+  let stretchX = settings.stretchX;
+  if (proj === "szalkai") {
+    ({ lengths, angles, stretchX } = szalkaiFaceSettings(settings));
+  }
+  const basis = basisVectors(angles, lengths, n, stretchX);
   return projectedPositions(basis, NEST_DIM, settings.nestScale);
 }
 

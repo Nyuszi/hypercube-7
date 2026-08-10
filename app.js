@@ -56,8 +56,9 @@ function currentProjection() {
   return PROJECTIONS[p] ? p : "nested";
 }
 
-function isNestedProjection() {
-  return currentProjection() === "nested";
+function usesNestLayout() {
+  const p = currentProjection();
+  return p === "nested" || p === "szalkai";
 }
 
 function updateProjectionUi() {
@@ -66,15 +67,18 @@ function updateProjectionUi() {
   document.querySelectorAll(".nested-only").forEach((node) => {
     node.hidden = proj !== "nested";
   });
+  document.querySelectorAll(".nest-layout-only").forEach((node) => {
+    node.hidden = !usesNestLayout();
+  });
   if (el.projectionHint) {
     if (proj === "szalkai") {
       el.projectionHint.hidden = false;
       el.projectionHint.textContent =
-        "Szalkai view: axis-aligned shelves of cubes (after Dr. István Szalkai). Nest scale and free angles apply only to Nested.";
+        "Szalkai view: same nested layout, with a perfect square face (dims 1–2 equal length, 90°). Changing either side length keeps them equal.";
     } else if (proj === "petrie") {
       el.projectionHint.hidden = false;
       el.projectionHint.textContent =
-        "Petrie view: Coxeter-plane projection — equal lengths give a regular 2n-gon outline. Nest scale and free angles apply only to Nested.";
+        "Petrie view: Coxeter-plane projection — equal lengths give a regular 2n-gon outline. Nest scale applies only to Nested / Szalkai.";
     } else {
       el.projectionHint.hidden = true;
       el.projectionHint.textContent = "";
@@ -83,8 +87,8 @@ function updateProjectionUi() {
   if (el.mathProjectionNote) {
     if (proj === "szalkai") {
       el.mathProjectionNote.innerHTML =
-        "This drawing is a <strong>Szalkai rectangle</strong> layout of <span class=\"math-sym\">Q<sub>n</sub></span> " +
-        "(parallel shelves with a rectangular outline), not a literal view of <span class=\"math-sym\">n</span>-space.";
+        "This drawing is a <strong>Szalkai</strong> nested projection of <span class=\"math-sym\">Q<sub>n</sub></span> " +
+        "(square face: equal orthogonal sides), not a literal view of <span class=\"math-sym\">n</span>-space.";
     } else if (proj === "petrie") {
       el.mathProjectionNote.innerHTML =
         "This drawing is a <strong>Petrie projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
@@ -172,7 +176,7 @@ function ensureEdgeColors() {
 }
 
 function dimLabel(i) {
-  if (!isNestedProjection()) return `Dim ${i + 1}`;
+  if (!usesNestLayout()) return `Dim ${i + 1}`;
   return DIM_LABELS[i];
 }
 
@@ -180,9 +184,10 @@ function buildDimControls() {
   el.lengthSliders.innerHTML = "";
   el.angleSliders.innerHTML = "";
   const n = state.settings.n;
+  const szalkai = currentProjection() === "szalkai";
 
   for (let i = 0; i < n; i++) {
-    const isNest = isNestedProjection() && i === NEST_DIM;
+    const isNest = usesNestLayout() && i === NEST_DIM;
 
     // Length / nest row
     const block = document.createElement("div");
@@ -274,8 +279,20 @@ function buildDimControls() {
       const syncLen = (raw) => {
         const v = Math.round(clamp(Number(raw), min, max));
         state.settings.lengths[i] = v;
-        range.value = String(v);
-        num.value = String(v);
+        // Szalkai: keep the face a square — dims 1 and 2 share one side length.
+        if (szalkai && (i === 0 || i === 1)) {
+          state.settings.lengths[0] = v;
+          state.settings.lengths[1] = v;
+          for (const j of [0, 1]) {
+            const rj = document.getElementById(`len-${j}`);
+            const nj = document.getElementById(`len-${j}-num`);
+            if (rj) rj.value = String(v);
+            if (nj) nj.value = String(v);
+          }
+        } else {
+          range.value = String(v);
+          num.value = String(v);
+        }
         commitGeometry();
         scheduleRedraw();
         scheduleHash();
@@ -318,7 +335,9 @@ function buildDimControls() {
     anum.max = "179.5";
     anum.step = "0.5";
     anum.value = state.settings.angles[i].toFixed(1);
-    anum.disabled = isNest;
+    // Nest dim has no free angle; Szalkai locks the square face (dims 1–2).
+    const angLocked = isNest || (szalkai && (i === 0 || i === 1));
+    anum.disabled = angLocked;
     anum.setAttribute("aria-label", `Angle ${i + 1}`);
     ahead.append(alabel, anum);
     const arange = document.createElement("input");
@@ -328,7 +347,7 @@ function buildDimControls() {
     arange.max = "179.5";
     arange.step = "0.5";
     arange.value = String(state.settings.angles[i]);
-    arange.disabled = isNest;
+    arange.disabled = angLocked;
     const syncAng = (raw) => {
       const v = Math.round(clamp(Number(raw), 0, 179.5) * 2) / 2;
       state.settings.angles[i] = v;
@@ -521,7 +540,7 @@ function animateDimensionChange(newN) {
   const targetLengths = state.committedLengths.slice();
   const targetNest = state.committedNest;
   const maxN = Math.max(oldN, newN, 1); // render at least Q1 shell while morphing to/from Q0
-  const nestAware = isNestedProjection();
+  const nestAware = usesNestLayout();
 
   // Snapshot start geometry (render at maxN so edges can appear/disappear).
   // Nested view keeps nest-dim length fixed and morphs nestScale instead.

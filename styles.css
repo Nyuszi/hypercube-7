@@ -148,6 +148,7 @@ select.field {
 }
 
 .nested-only[hidden],
+.nest-layout-only[hidden],
 .control-note[hidden] {
   display: none !important;
 }
