@@ -398,19 +398,19 @@ function buildDimControls() {
     }
 
     const dualDepth = i === 2 && usesNestLayout() && n > NEST_DIM;
+    const bindHover = (node) => {
+      node.addEventListener("pointerenter", () => {
+        state.highlightDim = i;
+        block.classList.add("highlight-active");
+        scheduleRedraw();
+      });
+      node.addEventListener("pointerleave", () => {
+        state.highlightDim = null;
+        block.classList.remove("highlight-active");
+        scheduleRedraw();
+      });
+    };
     if (!dualDepth) {
-      const bindHover = (node) => {
-        node.addEventListener("pointerenter", () => {
-          state.highlightDim = i;
-          block.classList.add("highlight-active");
-          scheduleRedraw();
-        });
-        node.addEventListener("pointerleave", () => {
-          state.highlightDim = null;
-          block.classList.remove("highlight-active");
-          scheduleRedraw();
-        });
-      };
       bindHover(block);
       el.lengthSliders.appendChild(block);
     }
