@@ -13,9 +13,9 @@ Then visit [http://127.0.0.1:8731/](http://127.0.0.1:8731/).
 
 ## Features
 
-- Nested (cuboid-in-cuboid) 4th dimension + shelf layout for higher dims
+- View modes: **Nested** (Schlegel), **Szalkai** (rectangular shelf layout), **Petrie** (Coxeter-plane / regular \(2n\)-gon)
 - Math panel: definition of \(Q_n\), live vertex/edge/degree counts, binary labels
-- Dark & bright palettes, per-dimension lengths / angles / colors
+- Dark & bright palettes, per-dimension lengths / colors (angles in Nested)
 - Live zoom, pan, fit
 - Animated dimension changes (grow / collapse axes with auto-fit)
 - PNG screenshot (1× / 2× / 3×) and SVG export
