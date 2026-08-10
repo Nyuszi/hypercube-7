@@ -301,14 +301,9 @@ export function labelColorForBackground(bg) {
 }
 
 export function referencePreset() {
-  const s = defaultSettings();
-  s.projection = "nested";
+  const s = applyProjectionDefaults(defaultSettings(), "szalkai");
   s.palette = "reference";
-  s.stretchX = 1.2;
-  s.nestScale = 0.42;
   s.glow = 0;
-  s.lengths = [72, 52, 104, 1, 300, 230, 470];
-  s.angles = [8, 98, 148, 0, 6, 78, 108];
   return s;
 }
 

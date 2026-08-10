@@ -10,14 +10,14 @@ import {
   buildHypercubeSvg,
   paletteGroups,
   graphStats,
-} from "./hypercube.js?v=20";
+} from "./hypercube.js?v=21";
 import {
   t,
   applyI18n,
   loadLocalePref,
   setLocalePref,
   getLocalePref,
-} from "./i18n.js?v=20";
+} from "./i18n.js?v=21";
 
 const PRESET_KEY = "hypercube-presets-v1";
 
