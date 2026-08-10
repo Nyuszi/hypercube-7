@@ -6,7 +6,26 @@
 export const NEST_DIM = 3;
 export const MARGIN = 26;
 
-/** Default (angle deg, length) for dimensions 0–6. */
+/** Drawing modes (2D layouts of the same Qₙ graph). */
+export const PROJECTIONS = {
+  nested: {
+    id: "nested",
+    label: "Nested",
+    short: "Nested / Schlegel",
+  },
+  szalkai: {
+    id: "szalkai",
+    label: "Szalkai",
+    short: "Szalkai rectangle",
+  },
+  petrie: {
+    id: "petrie",
+    label: "Petrie",
+    short: "Petrie projection",
+  },
+};
+
+/** Default (angle deg, length) for dimensions 0–6 (nested view). */
 export const DEFAULT_BASIS_POLAR = [
   [8.0, 72.0],
   [98.0, 52.0],
@@ -16,6 +35,12 @@ export const DEFAULT_BASIS_POLAR = [
   [78.0, 230.0],
   [108.0, 470.0],
 ];
+
+/** Length defaults tuned for Szalkai’s axis-aligned shelf layout. */
+export const SZALKAI_LENGTHS = [56, 48, 38, 100, 100, 160, 160];
+
+/** Equal edge length for a true Petrie (Coxeter-plane) projection. */
+export const PETRIE_EDGE = 48;
 
 export const DEFAULT_NEST_SCALE = 0.42;
 
@@ -178,6 +203,7 @@ export function systemDefaultPalette() {
 export function defaultSettings() {
   return {
     palette: systemDefaultPalette(),
+    projection: "nested",
     n: 7,
     nestScale: DEFAULT_NEST_SCALE,
     stretchX: 1.45,
@@ -192,6 +218,22 @@ export function defaultSettings() {
     edgeColors: null, // null = use palette; else length-7 array
     pngScale: 2,
   };
+}
+
+/** Length / angle presets when switching projection (keeps palette & style). */
+export function applyProjectionDefaults(settings, projection) {
+  const s = settings;
+  s.projection = PROJECTIONS[projection] ? projection : "nested";
+  if (s.projection === "szalkai") {
+    s.lengths = SZALKAI_LENGTHS.slice();
+  } else if (s.projection === "petrie") {
+    s.lengths = Array(7).fill(PETRIE_EDGE);
+  } else {
+    s.lengths = DEFAULT_BASIS_POLAR.map(([, len]) => len);
+    s.angles = DEFAULT_BASIS_POLAR.map(([deg]) => deg);
+    s.nestScale = DEFAULT_NEST_SCALE;
+  }
+  return s;
 }
 
 /** Relative luminance of a #rrggbb (or #rgb) color; used for label contrast. */
@@ -213,6 +255,7 @@ export function labelColorForBackground(bg) {
 
 export function referencePreset() {
   const s = defaultSettings();
+  s.projection = "nested";
   s.palette = "reference";
   s.stretchX = 1.2;
   s.nestScale = 0.42;
@@ -245,6 +288,85 @@ export function basisVectors(angles, lengths, n, stretchX = 1) {
     out.push([Math.cos(rad) * len * stretchX, Math.sin(rad) * len]);
   }
   return out;
+}
+
+/** Pure parallel projection: vertex = sum of basis vectors for bits set. */
+export function linearPositions(basis) {
+  const n = basis.length;
+  const positions = [];
+  for (let v = 0; v < 1 << n; v++) {
+    let x = 0;
+    let y = 0;
+    for (let i = 0; i < n; i++) {
+      if ((v >> i) & 1) {
+        x += basis[i][0];
+        y += basis[i][1];
+      }
+    }
+    positions.push([x, y]);
+  }
+  return positions;
+}
+
+/**
+ * Szalkai-style shelf layout (after Dr. István Szalkai’s cube-graph drawings):
+ * dims 0–1 axis-aligned rectangle, dim 2 short oblique depth, dims 3+ alternate
+ * horizontal / vertical offsets sized from the lower-dim bounding box so copies
+ * pack into a clean rectangle of cubes.
+ */
+export function szalkaiBasisVectors(lengths, n) {
+  const basis = [];
+  const len = (i, fallback) => {
+    const v = lengths[i];
+    return Number.isFinite(v) ? Math.max(0, v) : fallback;
+  };
+
+  if (n >= 1) basis.push([len(0, 56), 0]);
+  if (n >= 2) basis.push([0, len(1, 48)]);
+  if (n >= 3) {
+    const d = len(2, 38);
+    basis.push([d * 0.72, d * 0.52]);
+  }
+
+  for (let i = 3; i < n; i++) {
+    let xPos = 0;
+    let xNeg = 0;
+    let yPos = 0;
+    let yNeg = 0;
+    for (let j = 0; j < i; j++) {
+      const [x, y] = basis[j];
+      if (x > 0) xPos += x;
+      else xNeg += x;
+      if (y > 0) yPos += y;
+      else yNeg += y;
+    }
+    const w = xPos - xNeg;
+    const h = yPos - yNeg;
+    const ref = SZALKAI_LENGTHS[i] || 100;
+    const gapFactor = len(i, ref) / ref;
+    const pad = 22;
+    if ((i - 3) % 2 === 0) {
+      basis.push([(w + pad) * gapFactor, 0]);
+    } else {
+      basis.push([0, (h + pad) * gapFactor]);
+    }
+  }
+  return basis;
+}
+
+/**
+ * Petrie / Coxeter-plane projection: basis vectors at angles k·π/n so the
+ * Petrie polygon is a regular 2n-gon and all edges share equal length when
+ * lengths[i] match.
+ */
+export function petrieBasisVectors(lengths, n) {
+  const basis = [];
+  for (let i = 0; i < n; i++) {
+    const len = Number.isFinite(lengths[i]) ? Math.max(0, lengths[i]) : PETRIE_EDGE;
+    const a = (Math.PI * i) / n;
+    basis.push([Math.cos(a) * len, Math.sin(a) * len]);
+  }
+  return basis;
 }
 
 export function projectedPositions(basis, nestDim = NEST_DIM, nestScale = DEFAULT_NEST_SCALE) {
@@ -282,6 +404,25 @@ export function projectedPositions(basis, nestDim = NEST_DIM, nestScale = DEFAUL
   return positions;
 }
 
+/** Resolve 2D vertex positions for the active projection. */
+export function positionsForSettings(settings, n) {
+  if (n <= 0) return [[0, 0]];
+  const proj = PROJECTIONS[settings.projection] ? settings.projection : "nested";
+  if (proj === "szalkai") {
+    return linearPositions(szalkaiBasisVectors(settings.lengths, n));
+  }
+  if (proj === "petrie") {
+    return linearPositions(petrieBasisVectors(settings.lengths, n));
+  }
+  const basis = basisVectors(
+    settings.angles,
+    settings.lengths,
+    n,
+    settings.stretchX,
+  );
+  return projectedPositions(basis, NEST_DIM, settings.nestScale);
+}
+
 export function edgesByDimension(n) {
   const groups = [];
   for (let i = 0; i < n; i++) {
@@ -314,12 +455,7 @@ export function buildHypercubeSvg(settings, options = {}) {
   const { highlightDim = null, asString = false } = options;
   const n = Math.max(0, Math.min(7, settings.n | 0));
   const palette = resolvePalette({ ...settings, n });
-  const basis = n === 0
-    ? []
-    : basisVectors(settings.angles, settings.lengths, n, settings.stretchX);
-  let pos = n === 0
-    ? [[0, 0]]
-    : projectedPositions(basis, NEST_DIM, settings.nestScale);
+  let pos = positionsForSettings(settings, n);
 
   const xs = pos.map((p) => p[0]);
   const ys = pos.map((p) => p[1]);

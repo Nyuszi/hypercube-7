@@ -17,6 +17,15 @@
       <div class="brand">Hypercube <span id="brand-n">Q₇</span></div>
 
       <div class="select-wrap">
+        <label for="projection">View</label>
+        <select id="projection" class="field" aria-label="Projection view">
+          <option value="nested">Nested</option>
+          <option value="szalkai">Szalkai</option>
+          <option value="petrie">Petrie</option>
+        </select>
+      </div>
+
+      <div class="select-wrap">
         <label for="palette">Style</label>
         <select id="palette" class="field" aria-label="Color style"></select>
         <div class="palette-swatches" id="palette-swatches" aria-hidden="true"></div>
@@ -96,8 +105,8 @@
             <li>Equal-color edges flip the same bit — one dimension.</li>
             <li>The graph is bipartite (partition by parity of the number of 1-bits).</li>
             <li>Hamilton paths correspond to Gray codes on <span class="math-sym">n</span> bits.</li>
-            <li>This drawing is a <strong>2D projection</strong> of <span class="math-sym">Q<sub>n</sub></span>
-              (nested / Schlegel for the 4th dimension), not a literal view of <span class="math-sym">n</span>-space.</li>
+            <li id="math-projection-note">This drawing is a <strong>2D projection</strong> of <span class="math-sym">Q<sub>n</sub></span>,
+              not a literal view of <span class="math-sym">n</span>-space.</li>
           </ul>
           <div class="toggle-row">
             <input type="checkbox" id="show-labels">
@@ -115,26 +124,27 @@
             </div>
             <input type="range" id="n" min="0" max="7" step="1" value="7">
           </div>
-          <div class="slider-block">
+          <div class="slider-block nested-only">
             <div class="slider-head">
               <label for="nest-scale">Nest scale (dim 4)</label>
               <input type="number" class="num" id="nest-scale-num" min="0.15" max="0.85" step="0.01" value="0.42" aria-label="Nest scale value">
             </div>
             <input type="range" id="nest-scale" min="0.15" max="0.85" step="0.01" value="0.42">
           </div>
-          <div class="slider-block">
+          <div class="slider-block nested-only">
             <div class="slider-head">
               <label for="stretch-x">Horizontal stretch</label>
               <input type="number" class="num" id="stretch-x-num" min="0.6" max="2.5" step="0.01" value="1.45" aria-label="Horizontal stretch value">
             </div>
             <input type="range" id="stretch-x" min="0.6" max="2.5" step="0.01" value="1.45">
           </div>
+          <p class="control-note" id="projection-hint" hidden></p>
         </section>
 
         <section class="section">
           <h2>Line lengths</h2>
           <div id="length-sliders"></div>
-          <details class="advanced">
+          <details class="advanced nested-only">
             <summary>Advanced angles</summary>
             <div id="angle-sliders"></div>
           </details>

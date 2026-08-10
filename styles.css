@@ -136,6 +136,22 @@ select.field {
   min-width: 140px;
 }
 
+#projection.field {
+  min-width: 118px;
+}
+
+.control-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.nested-only[hidden],
+.control-note[hidden] {
+  display: none !important;
+}
+
 .palette-swatches {
   display: flex;
   gap: 3px;

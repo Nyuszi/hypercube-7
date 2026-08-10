@@ -1,10 +1,12 @@
 import {
   PALETTES,
+  PROJECTIONS,
   DIM_LABELS,
   NEST_DIM,
   DEFAULT_NEST_SCALE,
   defaultSettings,
   referencePreset,
+  applyProjectionDefaults,
   resolvePalette,
   buildHypercubeSvg,
   paletteGroups,
@@ -35,6 +37,7 @@ const el = {
   stage: document.getElementById("stage"),
   stageInner: document.getElementById("stage-inner"),
   stageWrap: document.querySelector(".stage-wrap"),
+  projection: document.getElementById("projection"),
   palette: document.getElementById("palette"),
   swatches: document.getElementById("palette-swatches"),
   brandN: document.getElementById("brand-n"),
@@ -44,7 +47,55 @@ const el = {
   presetName: document.getElementById("preset-name"),
   toast: document.getElementById("toast"),
   pngScale: document.getElementById("png-scale"),
+  projectionHint: document.getElementById("projection-hint"),
+  mathProjectionNote: document.getElementById("math-projection-note"),
 };
+
+function currentProjection() {
+  const p = state.settings.projection;
+  return PROJECTIONS[p] ? p : "nested";
+}
+
+function isNestedProjection() {
+  return currentProjection() === "nested";
+}
+
+function updateProjectionUi() {
+  const proj = currentProjection();
+  if (el.projection) el.projection.value = proj;
+  document.querySelectorAll(".nested-only").forEach((node) => {
+    node.hidden = proj !== "nested";
+  });
+  if (el.projectionHint) {
+    if (proj === "szalkai") {
+      el.projectionHint.hidden = false;
+      el.projectionHint.textContent =
+        "Szalkai view: axis-aligned shelves of cubes (after Dr. István Szalkai). Nest scale and free angles apply only to Nested.";
+    } else if (proj === "petrie") {
+      el.projectionHint.hidden = false;
+      el.projectionHint.textContent =
+        "Petrie view: Coxeter-plane projection — equal lengths give a regular 2n-gon outline. Nest scale and free angles apply only to Nested.";
+    } else {
+      el.projectionHint.hidden = true;
+      el.projectionHint.textContent = "";
+    }
+  }
+  if (el.mathProjectionNote) {
+    if (proj === "szalkai") {
+      el.mathProjectionNote.innerHTML =
+        "This drawing is a <strong>Szalkai rectangle</strong> layout of <span class=\"math-sym\">Q<sub>n</sub></span> " +
+        "(parallel shelves with a rectangular outline), not a literal view of <span class=\"math-sym\">n</span>-space.";
+    } else if (proj === "petrie") {
+      el.mathProjectionNote.innerHTML =
+        "This drawing is a <strong>Petrie projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
+        "(Coxeter plane; outer Petrie polygon is a regular <span class=\"math-sym\">2n</span>-gon), not a literal view of <span class=\"math-sym\">n</span>-space.";
+    } else {
+      el.mathProjectionNote.innerHTML =
+        "This drawing is a <strong>2D projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
+        "(nested / Schlegel for the 4th dimension), not a literal view of <span class=\"math-sym\">n</span>-space.";
+    }
+  }
+}
 
 function toast(msg) {
   el.toast.textContent = msg;
@@ -120,13 +171,18 @@ function ensureEdgeColors() {
   }
 }
 
+function dimLabel(i) {
+  if (!isNestedProjection()) return `Dim ${i + 1}`;
+  return DIM_LABELS[i];
+}
+
 function buildDimControls() {
   el.lengthSliders.innerHTML = "";
   el.angleSliders.innerHTML = "";
   const n = state.settings.n;
 
   for (let i = 0; i < n; i++) {
-    const isNest = i === NEST_DIM;
+    const isNest = isNestedProjection() && i === NEST_DIM;
 
     // Length / nest row
     const block = document.createElement("div");
@@ -164,7 +220,8 @@ function buildDimControls() {
     });
 
     const label = document.createElement("label");
-    label.textContent = isNest ? DIM_LABELS[i] : DIM_LABELS[i].replace(/ —.*$/, "");
+    const fullLabel = dimLabel(i);
+    label.textContent = isNest ? fullLabel : fullLabel.replace(/ —.*$/, "");
     label.htmlFor = isNest ? "nest-scale" : `len-${i}`;
 
     const num = document.createElement("input");
@@ -213,7 +270,7 @@ function buildDimControls() {
       num.max = String(max);
       num.step = "1";
       num.value = String(Math.round(state.settings.lengths[i]));
-      num.setAttribute("aria-label", `${DIM_LABELS[i]} length`);
+      num.setAttribute("aria-label", `${fullLabel} length`);
       const syncLen = (raw) => {
         const v = Math.round(clamp(Number(raw), min, max));
         state.settings.lengths[i] = v;
@@ -312,6 +369,7 @@ function setPair(rangeId, numId, value, fmt) {
 /* —— Sync form from settings —— */
 function syncFormFromSettings() {
   const s = state.settings;
+  if (!PROJECTIONS[s.projection]) s.projection = "nested";
   el.palette.value = s.palette;
   el.pngScale.value = String(s.pngScale);
   setPair("n", "n-num", s.n, (v) => String(v));
@@ -325,6 +383,7 @@ function syncFormFromSettings() {
   const pngMobile = document.getElementById("png-scale-mobile");
   if (pngMobile) pngMobile.value = String(s.pngScale);
   el.brandN.textContent = `Q${subscript(s.n)}`;
+  updateProjectionUi();
   buildDimControls();
   updateSwatches();
   updateMathPanel();
@@ -462,25 +521,27 @@ function animateDimensionChange(newN) {
   const targetLengths = state.committedLengths.slice();
   const targetNest = state.committedNest;
   const maxN = Math.max(oldN, newN, 1); // render at least Q1 shell while morphing to/from Q0
+  const nestAware = isNestedProjection();
 
   // Snapshot start geometry (render at maxN so edges can appear/disappear).
+  // Nested view keeps nest-dim length fixed and morphs nestScale instead.
   const startLengths = targetLengths.map((len, i) => {
-    if (newN > oldN && i >= oldN && i !== NEST_DIM) return 0;
-    if (newN < oldN && i >= newN && i !== NEST_DIM) return len;
+    if (newN > oldN && i >= oldN && !(nestAware && i === NEST_DIM)) return 0;
+    if (newN < oldN && i >= newN && !(nestAware && i === NEST_DIM)) return len;
     return len;
   });
   const endLengths = targetLengths.map((len, i) => {
-    if (newN < oldN && i >= newN && i !== NEST_DIM) return 0;
-    if (newN > oldN && i >= oldN && i !== NEST_DIM) return len;
+    if (newN < oldN && i >= newN && !(nestAware && i === NEST_DIM)) return 0;
+    if (newN > oldN && i >= oldN && !(nestAware && i === NEST_DIM)) return len;
     return len;
   });
 
   let startNest = targetNest;
   let endNest = targetNest;
-  if (oldN <= NEST_DIM && newN > NEST_DIM) {
+  if (nestAware && oldN <= NEST_DIM && newN > NEST_DIM) {
     startNest = 1; // outer = inner, then nest opens
     endNest = targetNest;
-  } else if (oldN > NEST_DIM && newN <= NEST_DIM) {
+  } else if (nestAware && oldN > NEST_DIM && newN <= NEST_DIM) {
     startNest = targetNest;
     endNest = 1; // collapse nest before dropping the dimension
   }
@@ -753,6 +814,18 @@ function setupResizeFit() {
 
 /* —— Controls —— */
 function setupControls() {
+  el.projection?.addEventListener("change", () => {
+    cancelDimAnim();
+    const next = el.projection.value;
+    applyProjectionDefaults(state.settings, next);
+    commitGeometry();
+    syncFormFromSettings();
+    redraw();
+    fitView();
+    scheduleHash();
+    toast(`${PROJECTIONS[currentProjection()].short}`);
+  });
+
   el.palette.addEventListener("change", () => {
     state.settings.palette = el.palette.value;
     state.settings.edgeColors = null; // reset overrides when switching palette
@@ -948,6 +1021,7 @@ function serializeSettings() {
   const s = state.settings;
   return {
     p: s.palette,
+    pr: currentProjection(),
     n: s.n,
     ns: s.nestScale,
     sx: s.stretchX,
@@ -967,6 +1041,7 @@ function serializeSettings() {
 function applySerialized(data) {
   const s = defaultSettings();
   if (data.p && PALETTES[data.p]) s.palette = data.p;
+  if (data.pr && PROJECTIONS[data.pr]) s.projection = data.pr;
   if (data.n != null) s.n = Math.max(0, Math.min(7, Number(data.n)));
   if (data.ns != null) s.nestScale = Number(data.ns);
   if (data.sx != null) s.stretchX = Number(data.sx);
