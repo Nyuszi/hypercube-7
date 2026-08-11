@@ -53,6 +53,7 @@ const STRINGS = {
       "Interactive hypercube-graph viewer. The Szalkai view with the Reference palette " +
       "is closest to Szalkai István’s original figures.",
     "about.author": "Author",
+    "about.repo": "Repository",
     "about.sources": "Sources",
     "about.source.wiki":
       "<a href=\"https://hu.wikipedia.org/wiki/Hiperkockagr%C3%A1f\" target=\"_blank\" rel=\"noopener noreferrer\">" +
@@ -196,6 +197,7 @@ const STRINGS = {
       "Interaktív hiperkockagráf-nézegető. A Szalkai nézet a Referencia palettával " +
       "áll legközelebb Szalkai István eredeti ábráihoz.",
     "about.author": "Szerző",
+    "about.repo": "Tároló",
     "about.sources": "Források",
     "about.source.wiki":
       "<a href=\"https://hu.wikipedia.org/wiki/Hiperkockagr%C3%A1f\" target=\"_blank\" rel=\"noopener noreferrer\">" +

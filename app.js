@@ -14,14 +14,14 @@ import {
   graphStats,
   clampN,
   padDimArray,
-} from "./hypercube.js?v=22";
+} from "./hypercube.js?v=23";
 import {
   t,
   applyI18n,
   loadLocalePref,
   setLocalePref,
   getLocalePref,
-} from "./i18n.js?v=22";
+} from "./i18n.js?v=23";
 
 const PRESET_KEY = "hypercube-presets-v1";
 
