@@ -3,10 +3,26 @@
  * Port of gen_hypercube.py for live browser rendering.
  */
 
+/** Maximum drawable dimension (Q₀ … Q_MAX_N). */
+export const MAX_N = 12;
 export const NEST_DIM = 3;
 /** Szalkai nests at the 3rd dimension (cube = square inside square); higher dims offset. */
 export const SZALKAI_NEST_DIM = 2;
 export const MARGIN = 26;
+
+/** Clamp n into the supported range. */
+export function clampN(n) {
+  return Math.max(0, Math.min(MAX_N, Number(n) | 0));
+}
+
+/** Pad / trim a settings array to MAX_N slots. */
+export function padDimArray(arr, fill) {
+  const out = Array.isArray(arr) ? arr.slice(0, MAX_N) : [];
+  while (out.length < MAX_N) {
+    out.push(typeof fill === "function" ? fill(out.length) : fill);
+  }
+  return out;
+}
 
 /** Drawing modes (2D layouts of the same Qₙ graph). */
 export const PROJECTIONS = {
@@ -27,7 +43,7 @@ export const PROJECTIONS = {
   },
 };
 
-/** Default (angle deg, length) for dimensions 0–6 (nested view). */
+/** Default (angle deg, length) for dimensions 0…MAX_N-1 (nested view). */
 export const DEFAULT_BASIS_POLAR = [
   [8.0, 72.0],
   [98.0, 52.0],
@@ -36,6 +52,11 @@ export const DEFAULT_BASIS_POLAR = [
   [6.0, 300.0],
   [78.0, 230.0],
   [108.0, 470.0],
+  [24.0, 620.0],
+  [140.0, 800.0],
+  [52.0, 1000.0],
+  [96.0, 1250.0],
+  [168.0, 1550.0],
 ];
 
 /**
@@ -50,6 +71,11 @@ export const SZALKAI_BASIS_POLAR = [
   [6.0, 300.0],
   [78.0, 230.0],
   [108.0, 470.0],
+  [24.0, 620.0],
+  [140.0, 800.0],
+  [52.0, 1000.0],
+  [96.0, 1250.0],
+  [168.0, 1550.0],
 ];
 
 /** Equal edge length for a true Petrie (Coxeter-plane) projection. */
@@ -65,6 +91,11 @@ export const DIM_LABELS = [
   "Dim 5 — shelf offset",
   "Dim 6 — layer offset",
   "Dim 7 — long bridge",
+  "Dim 8 — offset",
+  "Dim 9 — offset",
+  "Dim 10 — offset",
+  "Dim 11 — offset",
+  "Dim 12 — offset",
 ];
 
 /** Szalkai labels: dim 3 nests the face; dim 4+ are parallel copies. */
@@ -76,6 +107,11 @@ export const SZALKAI_DIM_LABELS = [
   "Dim 5 — shelf offset",
   "Dim 6 — layer offset",
   "Dim 7 — long bridge",
+  "Dim 8 — offset",
+  "Dim 9 — offset",
+  "Dim 10 — offset",
+  "Dim 11 — offset",
+  "Dim 12 — offset",
 ];
 
 export const PALETTES = {
@@ -83,7 +119,10 @@ export const PALETTES = {
     group: "dark",
     label: "Neon",
     background: "#05060a",
-    edges: ["#00e5ff", "#3df5c4", "#7cff5c", "#ffe14d", "#ff8a3d", "#ff3d84", "#b56cff"],
+    edges: [
+      "#00e5ff", "#3df5c4", "#7cff5c", "#ffe14d", "#ff8a3d", "#ff3d84", "#b56cff",
+      "#5ce1ff", "#c4ff6a", "#ff6ad5", "#6a8cff", "#ffc16a",
+    ],
     vertex: "#ffffff",
     vertexStroke: "none",
   },
@@ -91,7 +130,10 @@ export const PALETTES = {
     group: "dark",
     label: "Tokyo",
     background: "#11121a",
-    edges: ["#7dcfff", "#7aa2f7", "#bb9af7", "#73daca", "#9ece6a", "#e0af68", "#f7768e"],
+    edges: [
+      "#7dcfff", "#7aa2f7", "#bb9af7", "#73daca", "#9ece6a", "#e0af68", "#f7768e",
+      "#89b4fa", "#f9e2af", "#cba6f7", "#a6e3a1", "#fab387",
+    ],
     vertex: "#c0caf5",
     vertexStroke: "none",
   },
@@ -99,7 +141,10 @@ export const PALETTES = {
     group: "dark",
     label: "Dracula",
     background: "#12141c",
-    edges: ["#8be9fd", "#50fa7b", "#f1fa8c", "#ffb86c", "#ff79c6", "#bd93f9", "#ff5555"],
+    edges: [
+      "#8be9fd", "#50fa7b", "#f1fa8c", "#ffb86c", "#ff79c6", "#bd93f9", "#ff5555",
+      "#8be9fd", "#ffb86c", "#50fa7b", "#ff79c6", "#f1fa8c",
+    ],
     vertex: "#f8f8f2",
     vertexStroke: "none",
   },
@@ -107,7 +152,10 @@ export const PALETTES = {
     group: "dark",
     label: "Nord",
     background: "#161a22",
-    edges: ["#8fbcbb", "#88c0d0", "#81a1c1", "#a3be8c", "#ebcb8b", "#d08770", "#bf616a"],
+    edges: [
+      "#8fbcbb", "#88c0d0", "#81a1c1", "#a3be8c", "#ebcb8b", "#d08770", "#bf616a",
+      "#5e81ac", "#b48ead", "#a3be8c", "#88c0d0", "#d08770",
+    ],
     vertex: "#eceff4",
     vertexStroke: "none",
   },
@@ -115,7 +163,10 @@ export const PALETTES = {
     group: "dark",
     label: "Aurora",
     background: "#04090f",
-    edges: ["#9bffe4", "#3fe0b0", "#1fb6c9", "#3f7fe0", "#7a5cf0", "#c15ce0", "#ff8ecb"],
+    edges: [
+      "#9bffe4", "#3fe0b0", "#1fb6c9", "#3f7fe0", "#7a5cf0", "#c15ce0", "#ff8ecb",
+      "#5cffb0", "#5c9fff", "#d05cff", "#ffb05c", "#8ecbff",
+    ],
     vertex: "#e8fff8",
     vertexStroke: "none",
   },
@@ -123,7 +174,10 @@ export const PALETTES = {
     group: "dark",
     label: "Ember",
     background: "#0b0705",
-    edges: ["#fff1b8", "#ffd166", "#ffa53d", "#ff7a2f", "#ff4f45", "#e02f6b", "#a3308f"],
+    edges: [
+      "#fff1b8", "#ffd166", "#ffa53d", "#ff7a2f", "#ff4f45", "#e02f6b", "#a3308f",
+      "#ffc14d", "#ff6b4a", "#e04a8f", "#c44a2f", "#ffd98a",
+    ],
     vertex: "#fff4dd",
     vertexStroke: "none",
   },
@@ -131,7 +185,10 @@ export const PALETTES = {
     group: "dark",
     label: "Ice",
     background: "#060a12",
-    edges: ["#eaf7ff", "#a8e4ff", "#6cc6ff", "#4a9eff", "#6f7dff", "#9a6cff", "#cf6cff"],
+    edges: [
+      "#eaf7ff", "#a8e4ff", "#6cc6ff", "#4a9eff", "#6f7dff", "#9a6cff", "#cf6cff",
+      "#7dd3fc", "#a78bfa", "#38bdf8", "#c084fc", "#67e8f9",
+    ],
     vertex: "#ffffff",
     vertexStroke: "none",
   },
@@ -139,7 +196,10 @@ export const PALETTES = {
     group: "dark",
     label: "Gold",
     background: "#0a0806",
-    edges: ["#fffbe8", "#f7e6b0", "#e9cd83", "#d9ae55", "#c28e35", "#a06d22", "#7a4f16"],
+    edges: [
+      "#fffbe8", "#f7e6b0", "#e9cd83", "#d9ae55", "#c28e35", "#a06d22", "#7a4f16",
+      "#f0d78c", "#c9a227", "#a67c2a", "#d4b06a", "#8a6a28",
+    ],
     vertex: "#fff6d8",
     vertexStroke: "none",
   },
@@ -147,7 +207,10 @@ export const PALETTES = {
     group: "dark",
     label: "Spectrum",
     background: "#000000",
-    edges: ["#ff2d55", "#ff9500", "#ffe000", "#3ddc63", "#00d4d8", "#2f7bff", "#a45cff"],
+    edges: [
+      "#ff2d55", "#ff9500", "#ffe000", "#3ddc63", "#00d4d8", "#2f7bff", "#a45cff",
+      "#ff5e3a", "#20c997", "#5c7cfa", "#f06595", "#fcc419",
+    ],
     vertex: "#ffffff",
     vertexStroke: "none",
   },
@@ -155,7 +218,10 @@ export const PALETTES = {
     group: "bright",
     label: "Reference",
     background: "#ffffff",
-    edges: ["#2b2b2b", "#2b2b2b", "#2b2b2b", "#8d24b8", "#1a7f27", "#1c3fc4", "#cf2233"],
+    edges: [
+      "#2b2b2b", "#2b2b2b", "#2b2b2b", "#8d24b8", "#1a7f27", "#1c3fc4", "#cf2233",
+      "#e67e22", "#16a085", "#7f8c8d", "#8e44ad", "#c0392b",
+    ],
     vertex: "#f2ddd6",
     vertexStroke: "#4a3330",
   },
@@ -163,7 +229,10 @@ export const PALETTES = {
     group: "bright",
     label: "Paper",
     background: "#f7f1e8",
-    edges: ["#1a1a1a", "#3d3d3d", "#5c4a3a", "#8b3a2a", "#2a5c4a", "#2a3a6b", "#6b2a5c"],
+    edges: [
+      "#1a1a1a", "#3d3d3d", "#5c4a3a", "#8b3a2a", "#2a5c4a", "#2a3a6b", "#6b2a5c",
+      "#8b6914", "#3a5c8b", "#5c2a3a", "#2a6b5c", "#6b5c2a",
+    ],
     vertex: "#2a2118",
     vertexStroke: "none",
   },
@@ -171,7 +240,10 @@ export const PALETTES = {
     group: "bright",
     label: "Daylight",
     background: "#f4f7fb",
-    edges: ["#0b3d91", "#0a7a6e", "#1a8f2a", "#c9a227", "#d35400", "#c0392b", "#6c3483"],
+    edges: [
+      "#0b3d91", "#0a7a6e", "#1a8f2a", "#c9a227", "#d35400", "#c0392b", "#6c3483",
+      "#1abc9c", "#2980b9", "#e74c3c", "#8e44ad", "#f39c12",
+    ],
     vertex: "#1a2332",
     vertexStroke: "none",
   },
@@ -179,7 +251,10 @@ export const PALETTES = {
     group: "bright",
     label: "Pastel",
     background: "#faf6f0",
-    edges: ["#7eb8c9", "#8fbf88", "#e8c07a", "#e09a7a", "#d48aa8", "#a894c9", "#7a9ec9"],
+    edges: [
+      "#7eb8c9", "#8fbf88", "#e8c07a", "#e09a7a", "#d48aa8", "#a894c9", "#7a9ec9",
+      "#c9a87e", "#8ac9b8", "#c98a9e", "#9ec97a", "#8a8ac9",
+    ],
     vertex: "#5a5048",
     vertexStroke: "none",
   },
@@ -187,7 +262,10 @@ export const PALETTES = {
     group: "bright",
     label: "Citrus",
     background: "#fffbeb",
-    edges: ["#f59e0b", "#84cc16", "#14b8a6", "#0ea5e9", "#e11d48", "#a855f7", "#f97316"],
+    edges: [
+      "#f59e0b", "#84cc16", "#14b8a6", "#0ea5e9", "#e11d48", "#a855f7", "#f97316",
+      "#65a30d", "#0891b2", "#db2777", "#7c3aed", "#ea580c",
+    ],
     vertex: "#292524",
     vertexStroke: "none",
   },
@@ -195,7 +273,10 @@ export const PALETTES = {
     group: "bright",
     label: "Ink",
     background: "#ffffff",
-    edges: ["#111111", "#e11d48", "#ea580c", "#ca8a04", "#16a34a", "#2563eb", "#7c3aed"],
+    edges: [
+      "#111111", "#e11d48", "#ea580c", "#ca8a04", "#16a34a", "#2563eb", "#7c3aed",
+      "#0f766e", "#be123c", "#c2410c", "#4d7c0f", "#1d4ed8",
+    ],
     vertex: "#111111",
     vertexStroke: "none",
   },
@@ -203,7 +284,10 @@ export const PALETTES = {
     group: "bright",
     label: "Coral",
     background: "#fff5f3",
-    edges: ["#e85d4c", "#2a9d8f", "#264653", "#e9c46a", "#f4a261", "#9b5de5", "#1d3557"],
+    edges: [
+      "#e85d4c", "#2a9d8f", "#264653", "#e9c46a", "#f4a261", "#9b5de5", "#1d3557",
+      "#e76f51", "#2a9d8f", "#e9c46a", "#457b9d", "#f4a261",
+    ],
     vertex: "#2b1d1a",
     vertexStroke: "none",
   },
@@ -238,8 +322,8 @@ export function defaultSettings() {
     glow: 0,
     lengths: DEFAULT_BASIS_POLAR.map(([, len]) => len),
     angles: DEFAULT_BASIS_POLAR.map(([deg]) => deg),
-    visible: [true, true, true, true, true, true, true],
-    edgeColors: null, // null = use palette; else length-7 array
+    visible: Array(MAX_N).fill(true),
+    edgeColors: null, // null = use palette; else per-dim overrides
     pngScale: 2,
   };
 }
@@ -254,13 +338,15 @@ export function applyProjectionDefaults(settings, projection) {
     s.stretchX = 1;
     s.nestScale = DEFAULT_NEST_SCALE;
   } else if (s.projection === "petrie") {
-    s.lengths = Array(7).fill(PETRIE_EDGE);
+    s.lengths = Array(MAX_N).fill(PETRIE_EDGE);
+    s.angles = padDimArray(s.angles, (i) => (180 * i) / Math.max(s.n, 1));
   } else {
     s.lengths = DEFAULT_BASIS_POLAR.map(([, len]) => len);
     s.angles = DEFAULT_BASIS_POLAR.map(([deg]) => deg);
     s.nestScale = DEFAULT_NEST_SCALE;
     s.stretchX = 1.45;
   }
+  s.visible = padDimArray(s.visible, true);
   return s;
 }
 
@@ -309,9 +395,12 @@ export function referencePreset() {
 
 export function resolvePalette(settings) {
   const base = PALETTES[settings.palette] || PALETTES.neon;
-  const edges = settings.edgeColors
-    ? settings.edgeColors.slice(0, settings.n)
-    : base.edges.slice(0, settings.n);
+  const n = clampN(settings.n);
+  const src = settings.edgeColors || base.edges;
+  const edges = [];
+  for (let i = 0; i < n; i++) {
+    edges.push(src[i] || base.edges[i % base.edges.length] || "#888888");
+  }
   return {
     background: base.background,
     edges,
@@ -493,7 +582,7 @@ function meanEdgeLength(pos, edges) {
  */
 export function buildHypercubeSvg(settings, options = {}) {
   const { highlightDim = null, asString = false, labelMorph = null } = options;
-  const n = Math.max(0, Math.min(7, settings.n | 0));
+  const n = clampN(settings.n);
   const palette = resolvePalette({ ...settings, n });
   let pos = positionsForSettings(settings, n);
 

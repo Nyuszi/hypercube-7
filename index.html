@@ -130,9 +130,9 @@
           <div class="slider-block">
             <div class="slider-head">
               <label for="n" data-i18n="struct.dimensions">Dimensions</label>
-              <input type="number" class="num" id="n-num" min="0" max="7" step="1" value="7" data-i18n-attr-aria-label="struct.dimensionsValue">
+              <input type="number" class="num" id="n-num" min="0" max="12" step="1" value="7" data-i18n-attr-aria-label="struct.dimensionsValue">
             </div>
-            <input type="range" id="n" min="0" max="7" step="1" value="7">
+            <input type="range" id="n" min="0" max="12" step="1" value="7">
           </div>
           <div class="slider-block nested-only">
             <div class="slider-head">
@@ -192,11 +192,51 @@
           </div>
           <div class="preset-list" id="preset-list"></div>
         </section>
+
+        <section class="section about-panel" id="about">
+          <h2 data-i18n="section.about">About</h2>
+          <p class="about-blurb" data-i18n-html="about.blurb">
+            Interactive hypercube-graph viewer. The Szalkai view with the Reference palette
+            is closest to Szalkai István’s original figures.
+          </p>
+          <dl class="about-meta">
+            <div>
+              <dt data-i18n="about.author">Author</dt>
+              <dd>Horváth László Simon</dd>
+            </div>
+            <div>
+              <dt>LinkedIn</dt>
+              <dd>
+                <a
+                  href="https://www.linkedin.com/in/laszlo-horvath-s/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >linkedin.com/in/laszlo-horvath-s</a
+                >
+              </dd>
+            </div>
+          </dl>
+          <h3 class="about-sources-title" data-i18n="about.sources">Sources</h3>
+          <ul class="about-sources">
+            <li data-i18n-html="about.source.wiki">
+              <a
+                href="https://hu.wikipedia.org/wiki/Hiperkockagr%C3%A1f"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Hungarian Wikipedia — Hiperkockagráf</a
+              >
+            </li>
+            <li data-i18n-html="about.source.book">
+              Szalkai István, <em>Diszkrét matematika és algoritmuselmélet alapjai</em>,
+              Pannon Egyetemi Kiadó, 2006.
+            </li>
+          </ul>
+        </section>
       </aside>
     </div>
   </div>
 
   <div class="status-toast" id="toast" role="status"></div>
-  <script type="module" src="app.js?v=21"></script>
+  <script type="module" src="app.js?v=22"></script>
 </body>
 </html>

@@ -1,7 +1,9 @@
 import {
   PALETTES,
   PROJECTIONS,
+  MAX_N,
   DEFAULT_NEST_SCALE,
+  DEFAULT_BASIS_POLAR,
   defaultSettings,
   referencePreset,
   applyProjectionDefaults,
@@ -10,14 +12,16 @@ import {
   buildHypercubeSvg,
   paletteGroups,
   graphStats,
-} from "./hypercube.js?v=21";
+  clampN,
+  padDimArray,
+} from "./hypercube.js?v=22";
 import {
   t,
   applyI18n,
   loadLocalePref,
   setLocalePref,
   getLocalePref,
-} from "./i18n.js?v=21";
+} from "./i18n.js?v=22";
 
 const PRESET_KEY = "hypercube-presets-v1";
 
@@ -150,23 +154,33 @@ function edgeColor(i) {
 
 function ensureEdgeColors() {
   if (!state.settings.edgeColors) {
-    state.settings.edgeColors = resolvePalette({
-      ...state.settings,
-      edgeColors: null,
-    }).edges.concat(
-      PALETTES[state.settings.palette].edges.slice(state.settings.n),
+    const base = PALETTES[state.settings.palette] || PALETTES.neon;
+    state.settings.edgeColors = padDimArray(base.edges, (i) => {
+      return base.edges[i % base.edges.length] || "#888888";
+    });
+  } else {
+    state.settings.edgeColors = padDimArray(
+      state.settings.edgeColors,
+      (i) => {
+        const base = PALETTES[state.settings.palette] || PALETTES.neon;
+        return base.edges[i % base.edges.length] || "#888888";
+      },
     );
-    // pad to 7
-    while (state.settings.edgeColors.length < 7) {
-      state.settings.edgeColors.push("#888888");
-    }
   }
 }
 
 function dimLabel(i) {
-  if (currentProjection() === "szalkai") return t(`dim.szalkai.${i + 1}`);
-  if (usesNestLayout()) return t(`dim.nested.${i + 1}`);
-  return t("dim.short", { n: i + 1 });
+  const n = i + 1;
+  if (currentProjection() === "szalkai") {
+    const key = `dim.szalkai.${n}`;
+    const s = t(key);
+    if (s !== key) return s;
+  } else if (usesNestLayout()) {
+    const key = `dim.nested.${n}`;
+    const s = t(key);
+    if (s !== key) return s;
+  }
+  return t("dim.offset", { n });
 }
 
 function activeNestDim() {
@@ -396,8 +410,16 @@ function setPair(rangeId, numId, value, fmt) {
 function syncFormFromSettings() {
   const s = state.settings;
   if (!PROJECTIONS[s.projection]) s.projection = "nested";
+  s.n = clampN(s.n);
+  s.lengths = padDimArray(s.lengths, (i) => DEFAULT_BASIS_POLAR[i]?.[1] ?? 100);
+  s.angles = padDimArray(s.angles, (i) => DEFAULT_BASIS_POLAR[i]?.[0] ?? 0);
+  s.visible = padDimArray(s.visible, true);
   el.palette.value = s.palette;
   el.pngScale.value = String(s.pngScale);
+  const nRange = document.getElementById("n");
+  const nNum = document.getElementById("n-num");
+  if (nRange) nRange.max = String(MAX_N);
+  if (nNum) nNum.max = String(MAX_N);
   setPair("n", "n-num", s.n, (v) => String(v));
   setPair("stretch-x", "stretch-x-num", s.stretchX, (v) => v.toFixed(2));
   document.getElementById("show-vertices").checked = s.showVertices;
@@ -412,6 +434,33 @@ function syncFormFromSettings() {
   buildDimControls();
   updateSwatches();
   updateMathPanel();
+}
+
+function isAboutHash(raw = location.hash.replace(/^#/, "")) {
+  return raw === "about" || raw === "credits";
+}
+
+function scrollToAbout() {
+  const target = document.getElementById("about");
+  if (!target) return;
+  // Open mobile controls sheet if the about block lives there.
+  if (window.matchMedia("(max-width: 860px)").matches) {
+    const btn = document.getElementById("btn-controls");
+    if (btn && btn.getAttribute("aria-expanded") !== "true") btn.click();
+  }
+  requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function setupAboutLinks() {
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href="#about"], a[href="#credits"]');
+    if (!a) return;
+    // Keep shareable settings hash intact — only scroll in-page.
+    e.preventDefault();
+    scrollToAbout();
+  });
 }
 
 function updateMathPanel() {
@@ -524,8 +573,23 @@ function cancelDimAnim() {
  * removed axes collapse to 0 (zoom in). View is re-fit/centered every frame.
  */
 function animateDimensionChange(newN) {
-  newN = Math.max(0, Math.min(7, newN | 0));
+  newN = clampN(newN);
   ensureCommitted();
+  state.settings.lengths = padDimArray(
+    state.settings.lengths,
+    (i) => DEFAULT_BASIS_POLAR[i]?.[1] ?? 100,
+  );
+  state.settings.angles = padDimArray(
+    state.settings.angles,
+    (i) => DEFAULT_BASIS_POLAR[i]?.[0] ?? 0,
+  );
+  state.settings.visible = padDimArray(state.settings.visible, true);
+  if (state.committedLengths) {
+    state.committedLengths = padDimArray(
+      state.committedLengths,
+      (i) => DEFAULT_BASIS_POLAR[i]?.[1] ?? 100,
+    );
+  }
 
   // Interrupting a morph must not keep half-collapsed lengths as the new target.
   if (state.dimAnim != null) {
@@ -634,7 +698,7 @@ function animateDimensionChange(newN) {
     const u = Math.min(1, (now - t0) / duration);
     const e = easeInOutCubic(u);
 
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < MAX_N; i++) {
       state.settings.lengths[i] = lerp(startLengths[i], endLengths[i], e);
     }
     if (nestMorph) {
@@ -1010,7 +1074,7 @@ function setupControls() {
   };
 
   const applyN = (raw) => {
-    const newN = Math.round(clamp(Number(raw), 0, 7));
+    const newN = clampN(Math.round(Number(raw)));
     setPair("n", "n-num", newN, (v) => String(v));
     animateDimensionChange(newN);
   };
@@ -1109,13 +1173,20 @@ function renderPresetList() {
     loadBtn.addEventListener("click", () => {
       cancelDimAnim();
       state.settings = { ...defaultSettings(), ...item.settings };
-      // ensure arrays
-      state.settings.lengths = [...item.settings.lengths];
-      state.settings.angles = [...item.settings.angles];
-      state.settings.visible = [...item.settings.visible];
+      // ensure arrays (pad older 7-dim presets to MAX_N)
+      state.settings.lengths = padDimArray(
+        item.settings.lengths,
+        (i) => DEFAULT_BASIS_POLAR[i]?.[1] ?? 100,
+      );
+      state.settings.angles = padDimArray(
+        item.settings.angles,
+        (i) => DEFAULT_BASIS_POLAR[i]?.[0] ?? 0,
+      );
+      state.settings.visible = padDimArray(item.settings.visible, true);
       state.settings.edgeColors = item.settings.edgeColors
-        ? [...item.settings.edgeColors]
+        ? padDimArray(item.settings.edgeColors, "#888888")
         : null;
+      state.settings.n = clampN(state.settings.n);
       commitGeometry();
       syncFormFromSettings();
       scheduleRedraw();
@@ -1181,7 +1252,7 @@ function applySerialized(data) {
   const s = defaultSettings();
   if (data.p && PALETTES[data.p]) s.palette = data.p;
   if (data.pr && PROJECTIONS[data.pr]) s.projection = data.pr;
-  if (data.n != null) s.n = Math.max(0, Math.min(7, Number(data.n)));
+  if (data.n != null) s.n = clampN(Number(data.n));
   if (data.ns != null) s.nestScale = Number(data.ns);
   if (data.sx != null) s.stretchX = Number(data.sx);
   if (data.sw != null) s.strokeWidth = Number(data.sw);
@@ -1189,10 +1260,18 @@ function applySerialized(data) {
   if (data.sv != null) s.showVertices = Boolean(data.sv);
   if (data.sl != null) s.showLabels = Boolean(data.sl);
   if (data.g != null) s.glow = Number(data.g);
-  if (Array.isArray(data.L) && data.L.length === 7) s.lengths = data.L.map(Number);
-  if (Array.isArray(data.A) && data.A.length === 7) s.angles = data.A.map(Number);
-  if (Array.isArray(data.V) && data.V.length === 7) s.visible = data.V.map(Boolean);
-  if (Array.isArray(data.C) && data.C.length >= s.n) s.edgeColors = data.C;
+  if (Array.isArray(data.L) && data.L.length >= 1) {
+    s.lengths = padDimArray(data.L.map(Number), (i) => DEFAULT_BASIS_POLAR[i]?.[1] ?? 100);
+  }
+  if (Array.isArray(data.A) && data.A.length >= 1) {
+    s.angles = padDimArray(data.A.map(Number), (i) => DEFAULT_BASIS_POLAR[i]?.[0] ?? 0);
+  }
+  if (Array.isArray(data.V) && data.V.length >= 1) {
+    s.visible = padDimArray(data.V.map(Boolean), true);
+  }
+  if (Array.isArray(data.C) && data.C.length >= 1) {
+    s.edgeColors = padDimArray(data.C, "#888888");
+  }
   if (data.ps) s.pngScale = Number(data.ps);
   state.settings = s;
 }
@@ -1318,7 +1397,8 @@ function init() {
   applyI18n(document);
   if (el.locale) el.locale.value = getLocalePref();
   fillPaletteSelect();
-  const fromHash = loadFromHash();
+  const aboutDeepLink = isAboutHash();
+  const fromHash = !aboutDeepLink && loadFromHash();
   if (!fromHash) state.settings = defaultSettings();
   commitGeometry();
   syncFormFromSettings();
@@ -1327,11 +1407,13 @@ function init() {
   setupStageInteractions();
   setupResizeFit();
   setupKeyboard();
+  setupAboutLinks();
   renderPresetList();
   redraw();
   requestAnimationFrame(() => {
     fitView();
-    scheduleHash();
+    if (aboutDeepLink) scrollToAbout();
+    else scheduleHash();
   });
 }
 

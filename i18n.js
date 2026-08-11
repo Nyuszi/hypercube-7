@@ -48,6 +48,18 @@ const STRINGS = {
     "section.lengths": "Line lengths",
     "section.style": "Style",
     "section.presets": "Presets",
+    "section.about": "About",
+    "about.blurb":
+      "Interactive hypercube-graph viewer. The Szalkai view with the Reference palette " +
+      "is closest to Szalkai István’s original figures.",
+    "about.author": "Author",
+    "about.sources": "Sources",
+    "about.source.wiki":
+      "<a href=\"https://hu.wikipedia.org/wiki/Hiperkockagr%C3%A1f\" target=\"_blank\" rel=\"noopener noreferrer\">" +
+      "Hungarian Wikipedia — Hiperkockagráf</a>",
+    "about.source.book":
+      "Szalkai István, <em>Diszkrét matematika és algoritmuselmélet alapjai</em>, " +
+      "Pannon Egyetemi Kiadó, 2006.",
     "math.def":
       "The <strong>hypercube graph</strong> <span class=\"math-sym\" id=\"math-qn\">Q<sub>7</sub></span> " +
       "has vertex set <span class=\"math-sym\">{0,1}<sup>n</sup></span> " +
@@ -65,7 +77,8 @@ const STRINGS = {
       "This drawing is a <strong>2D projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
       "(nested / Schlegel for the 4th dimension), not a literal view of <span class=\"math-sym\">n</span>-space.",
     "math.proj.szalkai":
-      "This drawing is <strong>Szalkai’s presentation</strong> of <span class=\"math-sym\">Q<sub>n</sub></span>, " +
+      "This drawing is <strong><a href=\"#about\">Szalkai</a>’s presentation</strong> of " +
+      "<span class=\"math-sym\">Q<sub>n</sub></span>, " +
       "not a literal view of <span class=\"math-sym\">n</span>-space.",
     "math.proj.petrie":
       "This drawing is a <strong>Petrie projection</strong> of <span class=\"math-sym\">Q<sub>n</sub></span> " +
@@ -103,6 +116,7 @@ const STRINGS = {
     "toast.png": "PNG exported ({scale}×)",
     "toast.pngFail": "PNG export failed",
     "dim.short": "Dim {n}",
+    "dim.offset": "Dim {n} — offset",
     "dim.nestScale": "Nest scale value",
     "dim.nestScaleAria": "Nest scale (dim {n})",
     "dim.lengthAria": "{label} length",
@@ -117,6 +131,11 @@ const STRINGS = {
     "dim.nested.5": "Dim 5 — shelf offset",
     "dim.nested.6": "Dim 6 — layer offset",
     "dim.nested.7": "Dim 7 — long bridge",
+    "dim.nested.8": "Dim 8 — offset",
+    "dim.nested.9": "Dim 9 — offset",
+    "dim.nested.10": "Dim 10 — offset",
+    "dim.nested.11": "Dim 11 — offset",
+    "dim.nested.12": "Dim 12 — offset",
     "dim.szalkai.1": "Dim 1 — right",
     "dim.szalkai.2": "Dim 2 — up",
     "dim.szalkai.3": "Dim 3 — nest (inner square)",
@@ -124,6 +143,11 @@ const STRINGS = {
     "dim.szalkai.5": "Dim 5 — shelf offset",
     "dim.szalkai.6": "Dim 6 — layer offset",
     "dim.szalkai.7": "Dim 7 — long bridge",
+    "dim.szalkai.8": "Dim 8 — offset",
+    "dim.szalkai.9": "Dim 9 — offset",
+    "dim.szalkai.10": "Dim 10 — offset",
+    "dim.szalkai.11": "Dim 11 — offset",
+    "dim.szalkai.12": "Dim 12 — offset",
     "proj.nested.short": "Nested / Schlegel",
     "proj.szalkai.short": "Szalkai Hₙ construction",
     "proj.petrie.short": "Petrie projection",
@@ -167,6 +191,18 @@ const STRINGS = {
     "section.lengths": "Élhosszak",
     "section.style": "Stílus",
     "section.presets": "Előbeállítások",
+    "section.about": "Névjegy",
+    "about.blurb":
+      "Interaktív hiperkockagráf-nézegető. A Szalkai nézet a Referencia palettával " +
+      "áll legközelebb Szalkai István eredeti ábráihoz.",
+    "about.author": "Szerző",
+    "about.sources": "Források",
+    "about.source.wiki":
+      "<a href=\"https://hu.wikipedia.org/wiki/Hiperkockagr%C3%A1f\" target=\"_blank\" rel=\"noopener noreferrer\">" +
+      "Magyar Wikipédia — Hiperkockagráf</a>",
+    "about.source.book":
+      "Szalkai István, <em>Diszkrét matematika és algoritmuselmélet alapjai</em>, " +
+      "Pannon Egyetemi Kiadó, 2006.",
     "math.def":
       "A <strong>hiperkockagráf</strong> <span class=\"math-sym\" id=\"math-qn\">Q<sub>7</sub></span> " +
       "a hiperkocka csúcsaiból és éleiből álló gráf. " +
@@ -184,7 +220,8 @@ const STRINGS = {
       "Ez a rajz a <span class=\"math-sym\">Q<sub>n</sub></span> <strong>2D vetülete</strong> " +
       "(beágyazott / Schlegel a 4. dimenzióra), nem az <span class=\"math-sym\">n</span>-tér szó szerinti képe.",
     "math.proj.szalkai":
-      "Ez a rajz <span class=\"math-sym\">Q<sub>n</sub></span> <strong>Szalkai-féle ábrázolása</strong>, " +
+      "Ez a rajz <span class=\"math-sym\">Q<sub>n</sub></span> " +
+      "<strong><a href=\"#about\">Szalkai</a>-féle ábrázolása</strong>, " +
       "nem az <span class=\"math-sym\">n</span>-tér szó szerinti képe.",
     "math.proj.petrie":
       "Ez a rajz a <span class=\"math-sym\">Q<sub>n</sub></span> <strong>Petrie-vetülete</strong> " +
@@ -222,6 +259,7 @@ const STRINGS = {
     "toast.png": "PNG exportálva ({scale}×)",
     "toast.pngFail": "PNG export sikertelen",
     "dim.short": "Dim {n}",
+    "dim.offset": "Dim {n} — eltolás",
     "dim.nestScale": "Beágyazási arány",
     "dim.nestScaleAria": "Beágyazási arány (dim {n})",
     "dim.lengthAria": "{label} hossza",
@@ -236,6 +274,11 @@ const STRINGS = {
     "dim.nested.5": "Dim 5 — polceltolás",
     "dim.nested.6": "Dim 6 — rétegeltolás",
     "dim.nested.7": "Dim 7 — hosszú híd",
+    "dim.nested.8": "Dim 8 — eltolás",
+    "dim.nested.9": "Dim 9 — eltolás",
+    "dim.nested.10": "Dim 10 — eltolás",
+    "dim.nested.11": "Dim 11 — eltolás",
+    "dim.nested.12": "Dim 12 — eltolás",
     "dim.szalkai.1": "Dim 1 — jobbra",
     "dim.szalkai.2": "Dim 2 — fel",
     "dim.szalkai.3": "Dim 3 — beágyazás (belső négyzet)",
@@ -243,6 +286,11 @@ const STRINGS = {
     "dim.szalkai.5": "Dim 5 — polceltolás",
     "dim.szalkai.6": "Dim 6 — rétegeltolás",
     "dim.szalkai.7": "Dim 7 — hosszú híd",
+    "dim.szalkai.8": "Dim 8 — eltolás",
+    "dim.szalkai.9": "Dim 9 — eltolás",
+    "dim.szalkai.10": "Dim 10 — eltolás",
+    "dim.szalkai.11": "Dim 11 — eltolás",
+    "dim.szalkai.12": "Dim 12 — eltolás",
     "proj.nested.short": "Beágyazott / Schlegel",
     "proj.szalkai.short": "Szalkai Hₙ szerkesztés",
     "proj.petrie.short": "Petrie-vetület",
